@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#0a1a08" rx="28"/>
+  <circle cx="96" cy="96" r="74" fill="none" stroke="#1a7a28" stroke-width="3"/>
+  <path d="M96 28 C96 28 58 50 58 76 C58 98 74 114 96 124 C118 114 134 98 134 76 C134 50 96 28 96 28Z" fill="#1a7a28" opacity="0.55"/>
+  <rect x="91" y="32" width="10" height="62" rx="3" fill="white"/>
+  <rect x="70" y="50" width="52" height="10" rx="3" fill="white"/>
+  <rect x="18" y="90" width="42" height="10" rx="3" fill="#c8d0c8"/>
+  <rect x="18" y="78" width="10" height="34" rx="3" fill="#c8d0c8"/>
+  <rect x="132" y="90" width="42" height="10" rx="3" fill="#c8d0c8"/>
+  <rect x="164" y="78" width="10" height="34" rx="3" fill="#c8d0c8"/>
+  <text x="96" y="172" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4cd964" letter-spacing="1">FIT FOR LIFE</text>
+</svg>

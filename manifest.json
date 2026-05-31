@@ -1,0 +1,19 @@
+{
+  "name": "Fit for Life Challenge",
+  "short_name": "Fit for Life",
+  "description": "Seekers United 90-Day Faith, Fitness & Fellowship Challenge",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a1a08",
+  "theme_color": "#0a1a08",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

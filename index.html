@@ -12,36 +12,15 @@
 <meta name="description" content="Seekers United — 90-Day Faith, Fitness & Fellowship Challenge">
 <title>Fit for Life Challenge — Seekers United</title>
 
-<!-- Inline PWA manifest -->
-<link rel="manifest" id="pwa-manifest">
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
 
 <!-- Apple touch icon inline -->
 <link rel="apple-touch-icon" id="pwa-icon">
 
 <script>
-// Build SVG icon as base64
 var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0a1a08" rx="28"/><circle cx="96" cy="96" r="74" fill="none" stroke="#1a7a28" stroke-width="3"/><path d="M96 28 C96 28 58 50 58 76 C58 98 74 114 96 124 C118 114 134 98 134 76 C134 50 96 28 96 28Z" fill="#1a7a28" opacity="0.55"/><rect x="91" y="32" width="10" height="62" rx="3" fill="white"/><rect x="70" y="50" width="52" height="10" rx="3" fill="white"/><rect x="18" y="90" width="42" height="10" rx="3" fill="#c8d0c8"/><rect x="18" y="78" width="10" height="34" rx="3" fill="#c8d0c8"/><rect x="132" y="90" width="42" height="10" rx="3" fill="#c8d0c8"/><rect x="164" y="78" width="10" height="34" rx="3" fill="#c8d0c8"/><text x="96" y="172" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4cd964" letter-spacing="1">FIT FOR LIFE</text></svg>';
-var iconB64 = 'data:image/svg+xml;base64,' + btoa(iconSvg);
-document.getElementById('pwa-icon').href = iconB64;
-
-// Build manifest JSON
-var manifest = {
-  name: 'Fit for Life Challenge',
-  short_name: 'Fit for Life',
-  description: 'Seekers United 90-Day Faith, Fitness & Fellowship Challenge',
-  start_url: './',
-  display: 'standalone',
-  background_color: '#0a1a08',
-  theme_color: '#0a1a08',
-  orientation: 'portrait',
-  icons: [
-    { src: iconB64, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-    { src: iconB64, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-  ]
-};
-var manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-document.getElementById('pwa-manifest').href = URL.createObjectURL(manifestBlob);
-
+document.getElementById('pwa-icon').href = 'data:image/svg+xml;base64,' + btoa(iconSvg);
 </script>
 
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
