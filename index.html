@@ -817,7 +817,8 @@ async function doLogin(){
   if(!res.data||!res.data.user){ err.textContent = 'No user returned — try again'; setBtnLoad('li-btn',false); return; }
   err.textContent = 'Signing in...';
   err.style.color = 'var(--g)';
-  // onAuthStateChange SIGNED_IN event handles loadSession — no direct call needed
+  await loadSession(res.data.user);
+  setBtnLoad('li-btn', false);
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────────
@@ -2725,10 +2726,10 @@ async function saveNewPassword(){
       return;
     }
     if(event === 'SIGNED_IN' && session){
-      // Only auto-login if NOT coming from a recovery flow
+      // Only handle if not already loading (doLogin handles it directly)
       var hash = window.location.hash||'';
       if(hash.includes('type=recovery')) return;
-      await loadSession(session.user);
+      if(!isLoadingSession) await loadSession(session.user);
     }
   });
 
