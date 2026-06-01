@@ -658,6 +658,32 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   </div>
 </div></div>
 
+<!-- Edit Weekly Devotional Submission (admin) -->
+<div class="modal-bg" id="m-edit-weekly"><div class="modal">
+  <div class="modal-head"><span class="modal-title">✏️ Edit weekly submission</span><button class="modal-x" onclick="closeModal('m-edit-weekly')">✕</button></div>
+  <div id="ew-info" style="font-size:15px;color:var(--tx3);margin-bottom:1rem"></div>
+  <div class="field"><div class="flabel">Reflection</div>
+    <textarea class="inp" id="ew-reflection" rows="5" style="height:auto;padding:12px 13px;resize:none;line-height:1.6"></textarea>
+  </div>
+  <div class="field"><div class="flabel">Points awarded</div>
+    <select class="inp" id="ew-pts">
+      <option value="">— Not yet awarded —</option>
+      <option value="1">1 pt</option>
+      <option value="2">2 pts</option>
+      <option value="3">3 pts</option>
+    </select>
+  </div>
+  <div class="field"><div class="flabel">Status</div>
+    <select class="inp" id="ew-status">
+      <option value="pending">Pending</option>
+      <option value="approved">Approved</option>
+      <option value="rejected">Rejected</option>
+    </select>
+  </div>
+  <button class="btn btn-g" onclick="saveEditWeeklyDevot()">Save changes</button>
+  <div class="err" id="ew-err"></div>
+</div></div>
+
 <!-- Weekly Devotional Review (admin) -->
 <div class="modal-bg" id="m-weekly-review"><div class="modal">
   <div class="modal-head"><span class="modal-title">📚 Weekly devotional review</span><button class="modal-x" onclick="closeModal('m-weekly-review')">✕</button></div>
@@ -1140,7 +1166,9 @@ function renderAdminDevot(){
   html += '</div>';
 
   // Today
-  html += '<div class="c"><div class="c-title">Today — '+formatDate(today)+'</div>';
+  html += '<div class="c"><div class="section-head"><div class="c-title" style="margin:0">Today — '+formatDate(today)+'</div>'
+    +(todayDevot?'<button class="btn-sm btn-sm-ghost" onclick="openEditDevotModal(\''+todayDevot.id+'\')">&#9998; Edit</button>':'')
+    +'</div>';
   if(todayDevot){
     html += '<div style="font-size:20px;font-weight:500;color:var(--tx);margin-bottom:4px">'+todayDevot.title+'</div>'
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+' · '+DAILY_RESPONSES.filter(function(r){ return r.devotional_id===todayDevot.id; }).length+' responses</div>'
@@ -2395,22 +2423,64 @@ function openWeeklyReview(subId){
   var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
   var c = tc(ti<0?0:ti);
   var sc = sub.status==='approved'?'tg':sub.status==='rejected'?'tred':'tgray';
+  var submittedAt = sub.created_at ? new Date(sub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
   document.getElementById('m-weekly-review-body').innerHTML =
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">'
     +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(m.full_name)+'</div>'
-    +'<div><div style="font-size:20px;font-weight:500">'+m.full_name+'</div>'
-    +'<div style="font-size:16px;color:var(--tx3)">Week '+sub.week+' · <span class="tag '+sc+'" style="font-size:14px">'+sub.status+'</span></div></div></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:20px;font-weight:500">'+m.full_name+'</div>'
+    +'<div style="font-size:15px;color:var(--tx3)">Week '+sub.week+' · '+submittedAt+' · <span class="tag '+sc+'" style="font-size:14px">'+sub.status+'</span></div></div></div>'
     +'<img src="'+sub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:220px;object-fit:cover;margin-bottom:.875rem;cursor:pointer" onclick="window.open(\''+sub.screenshot_url+'\',\'_blank\')">'
     +'<div style="font-size:16px;color:var(--tx3);margin-bottom:4px">Reflection</div>'
     +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.65;margin-bottom:1rem">"'+sub.reflection+'"</div>'
     +(sub.status==='pending'?'<div class="field"><div class="flabel">Points to award</div>'
     +'<select class="inp" id="wdr-pts"><option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option></select></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.5rem">'
-    +'<button class="btn btn-danger" style="height:42px;font-size:13px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'rejected\',0)">&#10007; Reject</button>'
-    +'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'approved\',parseInt(document.getElementById(\'wdr-pts\').value))">&#10003; Approve</button>'
-    +'</div>':'<div style="font-size:18px;color:var(--tx3);text-align:center;padding:.5rem">'+(sub.status==='approved'?'Approved · '+sub.pts_awarded+' pt'+(sub.pts_awarded>1?'s':'')+' awarded':'Rejected')+'</div>');
+    +'<button class="btn btn-danger" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'rejected\',0)">&#10007; Reject</button>'
+    +'<button class="btn btn-g" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'approved\',parseInt(document.getElementById(\'wdr-pts\').value))">&#10003; Approve</button>'
+    +'</div>'
+    :'<div style="font-size:18px;color:var(--tx3);text-align:center;padding:.5rem 0">'+(sub.status==='approved'?'Approved · '+sub.pts_awarded+' pt'+(sub.pts_awarded>1?'s':'')+' awarded':'Rejected')+'</div>')
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.75rem;border-top:1px solid var(--bdr);padding-top:.75rem">'
+    +'<button class="btn btn-ghost" style="height:40px;font-size:15px" onclick="openEditWeeklyDevot(\''+sub.id+'\')">&#9998; Edit</button>'
+    +'<button class="btn btn-danger" style="height:40px;font-size:15px" onclick="deleteWeeklyDevot(\''+sub.id+'\')">&#128465; Delete</button>'
+    +'</div>';
   openModal('m-weekly-review');
 }
+var editingWeeklySubId = null;
+function openEditWeeklyDevot(subId){
+  var sub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.id===subId; });
+  if(!sub) return;
+  var m = MEMBERS.find(function(x){ return x.id===sub.participant_id; })||{full_name:'?'};
+  editingWeeklySubId = subId;
+  document.getElementById('ew-info').textContent = m.full_name+' · Week '+sub.week;
+  document.getElementById('ew-reflection').value = sub.reflection;
+  document.getElementById('ew-pts').value = sub.pts_awarded||'';
+  document.getElementById('ew-status').value = sub.status;
+  document.getElementById('ew-err').textContent = '';
+  closeModal('m-weekly-review');
+  openModal('m-edit-weekly');
+}
+async function saveEditWeeklyDevot(){
+  var reflection = document.getElementById('ew-reflection').value.trim();
+  var pts = document.getElementById('ew-pts').value;
+  var status = document.getElementById('ew-status').value;
+  var err = document.getElementById('ew-err');
+  if(!reflection){ err.textContent='Reflection cannot be empty'; return; }
+  var upd = { reflection:reflection, status:status, pts_awarded: pts?parseInt(pts):null };
+  var res = await sb.from('weekly_devot_submissions').update(upd).eq('id', editingWeeklySubId);
+  if(res.error){ err.textContent=res.error.message; return; }
+  closeModal('m-edit-weekly');
+  toast('Submission updated &#9998;');
+  await refreshCurrentTab();
+}
+async function deleteWeeklyDevot(subId){
+  if(!confirm('Delete this weekly devotional submission? This cannot be undone.')) return;
+  var res = await sb.from('weekly_devot_submissions').delete().eq('id', subId);
+  if(res.error){ toast('Error: '+res.error.message); return; }
+  closeModal('m-weekly-review');
+  toast('Submission deleted');
+  await refreshCurrentTab();
+}
+
 async function reviewWeeklyDevot(subId, status, pts){
   var sub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.id===subId; });
   if(!sub) return;
