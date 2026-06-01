@@ -812,11 +812,14 @@ async function doLogin(){
   err.style.color = 'var(--danger)';
   if(!email||!pass){ err.textContent='Enter email and password'; return; }
   setBtnLoad('li-btn', true);
+  // Clear any stale hash from password reset links
+  if(window.location.hash) window.history.replaceState(null, '', window.location.pathname);
   var res = await sb.auth.signInWithPassword({ email: email, password: pass });
   if(res.error){ err.textContent = res.error.message; setBtnLoad('li-btn',false); return; }
   if(!res.data||!res.data.user){ err.textContent = 'No user returned — try again'; setBtnLoad('li-btn',false); return; }
   err.textContent = 'Signing in...';
   err.style.color = 'var(--g)';
+  isLoadingSession = false; // reset guard before calling
   await loadSession(res.data.user);
   setBtnLoad('li-btn', false);
 }
@@ -2710,6 +2713,12 @@ async function saveNewPassword(){
 
 // ── AUTO LOGIN ────────────────────────────────────────────────────────────────
 (async function(){
+  // Clear stale URL hash unless it's a recovery token
+  var hash = window.location.hash||'';
+  if(hash && !hash.includes('type=recovery') && !hash.includes('access_token')) {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+
   // Listen for PASSWORD_RECOVERY event FIRST before anything else
   // This fires when user clicks the reset link in their email
   sb.auth.onAuthStateChange(async function(event, session){
