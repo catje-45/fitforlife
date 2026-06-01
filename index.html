@@ -1174,7 +1174,23 @@ function renderAdminDevot(){
     +'<button class="btn-sm btn-sm-g" onclick="openDailyPostModal()">+ Post daily</button>'
     +'</div>';
 
-  // ── MY WEEKLY SUBMISSION (personal, for admin/devldr as participant) ──
+  // ── MY DAILY REFLECTION (personal, for admin/devldr as participant) ──
+  var myDailyResponse = todayDevot ? DAILY_RESPONSES.find(function(r){ return r.devotional_id===todayDevot.id&&r.participant_id===PROFILE.id; }) : null;
+  if(todayDevot){
+    html += '<div class="c" style="border-color:var(--bdr2)">'
+      +'<div class="c-title" style="color:var(--g)">&#9997; My reflection — today</div>';
+    if(myDailyResponse){
+      var dsc = myDailyResponse.status==='approved'?'tg':myDailyResponse.status==='rejected'?'tred':'tgray';
+      var dsl = myDailyResponse.status==='approved'?'&#10003; Approved':myDailyResponse.status==='rejected'?'&#10007; Rejected':'&#9203; Pending review';
+      html += '<span class="tag '+dsc+'" style="margin-bottom:.5rem;display:inline-block">'+dsl+'</span>'
+        +'<div style="font-size:16px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+myDailyResponse.reflection+'"</div>';
+      if(myDailyResponse.status==='rejected') html += '<button class="btn btn-g" style="height:38px;font-size:13px;margin-top:.75rem" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">Resubmit</button>';
+    } else {
+      html += '<div style="font-size:16px;color:var(--tx2);margin-bottom:.75rem">&#9200; Closes midnight · <span style="color:var(--gold)">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+'</span></div>'
+        +'<button class="btn btn-g" style="height:42px;font-size:15px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write my reflection</button>';
+    }
+    html += '</div>';
+  }
   var myWdsSub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.participant_id===PROFILE.id&&s.week===SETTINGS.current_week; });
   var weekExpired = isWeekExpired(SETTINGS.current_week);
   var deadlineStr = getWeekDeadline(SETTINGS.current_week);
