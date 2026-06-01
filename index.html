@@ -2724,7 +2724,6 @@ async function saveNewPassword(){
   sb.auth.onAuthStateChange(async function(event, session){
     console.log('Auth event:', event, session ? 'session exists' : 'no session');
     if(event === 'PASSWORD_RECOVERY'){
-      // Don't log them in — show reset form instead
       showScr('scr-auth');
       document.getElementById('rp-pass').value = '';
       document.getElementById('rp-pass2').value = '';
@@ -2734,12 +2733,8 @@ async function saveNewPassword(){
       openModal('m-reset-password');
       return;
     }
-    if(event === 'SIGNED_IN' && session){
-      // Only handle if not already loading (doLogin handles it directly)
-      var hash = window.location.hash||'';
-      if(hash.includes('type=recovery')) return;
-      if(!isLoadingSession) await loadSession(session.user);
-    }
+    // SIGNED_IN is handled directly by doLogin() — ignore it here
+    // to prevent double loadSession calls
   });
 
   // Also check URL hash directly for recovery type
