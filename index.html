@@ -842,6 +842,8 @@ async function doRegister(){
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
+var sessionLoading = false;
+
 async function doLogin(){
   var email = document.getElementById('li-email').value.trim();
   var pass = document.getElementById('li-pass').value;
@@ -850,11 +852,13 @@ async function doLogin(){
   err.style.color = 'var(--danger)';
   if(!email||!pass){ err.textContent='Enter email and password'; return; }
   setBtnLoad('li-btn', true);
+  if(window.location.hash) window.history.replaceState(null,'',window.location.pathname);
   var res = await sb.auth.signInWithPassword({ email: email, password: pass });
   if(res.error){ err.textContent = res.error.message; setBtnLoad('li-btn',false); return; }
   if(!res.data||!res.data.user){ err.textContent = 'No user returned — try again'; setBtnLoad('li-btn',false); return; }
-  err.textContent = 'Signed in, loading...';
+  err.textContent = 'Signing in...';
   err.style.color = 'var(--g)';
+  sessionLoading = false;
   await loadSession(res.data.user);
   setBtnLoad('li-btn', false);
 }
@@ -874,17 +878,19 @@ async function refreshSession(){
 
 // ── SESSION LOAD ──────────────────────────────────────────────────────────────
 async function loadSession(user){
+  if(sessionLoading) return;
+  sessionLoading = true;
   var err = document.getElementById('li-err');
   try {
     USER = user;
     var profRes = await sb.from('profiles').select('*').eq('id', user.id).single();
-    if(profRes.error){ err.textContent = 'Profile error: '+profRes.error.message; err.style.color='var(--danger)'; return; }
+    if(profRes.error){ err.textContent = 'Profile error: '+profRes.error.message; err.style.color='var(--danger)'; sessionLoading=false; return; }
     PROFILE = profRes.data;
-    if(!PROFILE){ err.textContent = 'No profile found — run migrations first'; err.style.color='var(--danger)'; return; }
+    if(!PROFILE){ err.textContent = 'No profile found — run migrations first'; err.style.color='var(--danger)'; sessionLoading=false; return; }
     if(PROFILE.role === 'pending'){
       await loadData();
       launchParticipant();
-      return;
+      sessionLoading=false; return;
     }
     await loadData();
     if(PROFILE.role === 'admin') launchAdmin();
@@ -896,6 +902,7 @@ async function loadSession(user){
     err.style.color = 'var(--danger)';
     console.error('loadSession error:', e);
   }
+  sessionLoading = false;
 }
 
 // ── SAFE QUERY HELPERS ────────────────────────────────────────────────────────
@@ -2771,7 +2778,6 @@ async function saveNewPassword(){
   // This fires when user clicks the reset link in their email
   sb.auth.onAuthStateChange(async function(event, session){
     if(event === 'PASSWORD_RECOVERY'){
-      // Don't log them in — show reset form instead
       showScr('scr-auth');
       document.getElementById('rp-pass').value = '';
       document.getElementById('rp-pass2').value = '';
@@ -2779,14 +2785,8 @@ async function saveNewPassword(){
       document.getElementById('rp-btn').disabled = false;
       document.getElementById('rp-btn').style.opacity = '1';
       openModal('m-reset-password');
-      return;
     }
-    if(event === 'SIGNED_IN' && session){
-      // Only auto-login if NOT coming from a recovery flow
-      var hash = window.location.hash||'';
-      if(hash.includes('type=recovery')) return;
-      await loadSession(session.user);
-    }
+    // SIGNED_IN handled directly by doLogin — not here
   });
 
   // Also check URL hash directly for recovery type
