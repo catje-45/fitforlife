@@ -1600,14 +1600,17 @@ function renderPartStats(){
       +'<div class="hero-sub">total points · no weight tracking</div>'
       +'</div>';
   }
+  var myTeamRank = tpts.findIndex(function(tt){ return tt.t.id===PROFILE.team_id; })+1;
+
   html += '<div class="mg3">'
     +'<div class="met"><div class="met-n">'+ptd.total.toFixed(0)+'</div><div class="met-l">Total pts</div></div>'
     +'<div class="met"><div class="met-n">#'+(myRank||'—')+'</div><div class="met-l">My rank</div></div>'
-    +'<div class="met"><div class="met-n">'+ptd.devotTotal+'</div><div class="met-l">Devotions</div></div>'
+    +'<div class="met"><div class="met-n">'+(myTeamRank?'#'+myTeamRank:'—')+'</div><div class="met-l">Team rank</div></div>'
     +'</div>'
     +'<div class="c"><div class="c-title">My progress</div>';
   if(isDevotOnly){
     html += '<div class="row-item"><div class="ri-label">Participation type</div><div class="ri-val"><span class="tag tblue">📖 Devotion &amp; Challenges</span></div></div>'
+      +'<div class="row-item"><div class="ri-label">Team rank</div><div class="ri-val" style="color:var(--gold);font-family:var(--head);font-size:22px">'+(myTeamRank?'#'+myTeamRank:'—')+'</div></div>'
       +'<div class="row-item"><div class="ri-label">Devotional pts</div><div class="ri-val">'+ptd.devotTotal+'</div></div>'
       +'<div class="row-item"><div class="ri-label">Challenge pts</div><div class="ri-val">'+ptd.challengeTotal+'</div></div>'
       +'<div class="row-item"><div class="ri-label">Prize refund</div><div class="ri-val"><span class="tag tgray">Not eligible (weight loss only)</span></div></div>';
@@ -1617,6 +1620,7 @@ function renderPartStats(){
       +'<div class="row-item"><div class="ri-label">Weight lost</div><div class="ri-val" style="color:'+pc+'">'+(myLogs[0]&&PROFILE.start_weight?(PROFILE.start_weight-myLogs[0].weight).toFixed(1)+'kg':'—')+'</div></div>'
       +'<div class="row-item"><div class="ri-label">5% goal</div><div class="ri-val">'+(ptd.latestPct>=5?'<span class="tag tg">Achieved!</span>':'<span class="tag tgray">In progress</span>')+'</div></div>'
       +'<div class="row-item"><div class="ri-label">Team avg 5% goal</div><div class="ri-val">'+(myTeam.teamGoalMet?'<span class="tag tg">Achieved!</span>':myTeam.weightMembers&&myTeam.weightMembers.length===0?'<span class="tag tgray">No weight members</span>':'<span class="tag tgray">'+(myTeam.avgPctLost||0).toFixed(1)+'% avg / 5%</span>')+'</div></div>'
+      +'<div class="row-item"><div class="ri-label">Team rank</div><div class="ri-val" style="color:var(--gold);font-family:var(--head);font-size:22px">'+(myTeamRank?'#'+myTeamRank:'—')+'</div></div>'
       +'<div class="row-item"><div class="ri-label">Prize refund earned</div><div class="ri-val" style="color:var(--g)">$'+back.toFixed(0)+'</div></div>';
   }
   html += '</div>';
@@ -1783,12 +1787,10 @@ function renderAdminLb(){
   html += '</div><div class="c"><div class="c-title">Team ranking</div>';
   if(!tpts.length) html += '<div class="empty">No teams yet</div>';
   var maxT = tpts[0]?tpts[0].totalPts||1:1;
-  tpts.forEach(function(x,i){ html += teamLbItem(x,i,maxT); });
+  tpts.forEach(function(x,i){ html += teamLbItem(x,i,maxT,false); });
   html += '</div></div>';
   return html;
 }
-
-// ── NAME MASKING (participant view) ──────────────────────────────────────────
 function maskName(fullName, isMe){
   if(isMe) return fullName;
   var parts = (fullName||'?').trim().split(' ');
@@ -1812,9 +1814,6 @@ function renderPartLb(){
   if(!pts.length) html += '<div class="empty" style="padding:1rem">No data yet</div>';
   var maxPts = pts[0]?pts[0].total||1:1;
   pts.forEach(function(x,i){ html += lbItem(x,i,maxPts,true); });
-  html += '</div><div class="c"><div class="c-title">Team ranking</div>';
-  var maxT = tpts[0]?tpts[0].totalPts||1:1;
-  tpts.forEach(function(x,i){ html += teamLbItem(x,i,maxT); });
   html += '</div></div>';
   return html;
 }
@@ -1898,7 +1897,7 @@ function lbItem(x, i, maxPts, maskNames){
   var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
   var rc = i===0?'var(--gold)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--tx3)';
   var barW = maxPts ? Math.round(x.total/maxPts*100) : 0;
-  var tname = (TEAMS.find(function(t){ return t.id===x.p.team_id; })||{name:'?'}).name;
+  var tname = maskNames ? '' : (TEAMS.find(function(t){ return t.id===x.p.team_id; })||{name:'?'}).name;
   var displayName = maskNames ? maskName(x.p.full_name, isMe) : x.p.full_name;
   var isDevotOnly = x.p.track_weight === false;
   var pctStr = x.latestPct!==null ? x.latestPct.toFixed(1)+'% lost' : '—';
@@ -1907,7 +1906,7 @@ function lbItem(x, i, maxPts, maskNames){
     +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(x.p.full_name)+'</div>'
     +'<div style="flex:1;min-width:0">'
     +'<div class="lb-name">'+displayName+(isMe?' <span style="font-size:12px;color:var(--g)">(you)</span>':'')+'</div>'
-    +'<div class="lb-sub">'+tname+'</div>'
+    +'<div class="lb-sub">'+(maskNames ? '' : tname)+'</div>'
     +(maxPts!==null?'<div class="prog"><div class="prog-f" style="width:'+barW+'%"></div></div>':'')
     +'</div>'
     +'<div style="text-align:right;flex-shrink:0">'
@@ -1916,17 +1915,18 @@ function lbItem(x, i, maxPts, maskNames){
     +'</div></div>';
 }
 
-function teamLbItem(x, i, maxPts){
+function teamLbItem(x, i, maxPts, maskNames){
   var c = tc(x.idx);
   var isMyTeam = PROFILE && x.t.id === PROFILE.team_id;
   var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
   var rc = i===0?'var(--gold)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--tx3)';
   var barW = maxPts ? Math.round(x.totalPts/maxPts*100) : 0;
+  var displayName = maskNames ? 'Team '+(i+1) : x.t.name;
   return '<div class="lb '+cls+(isMyTeam?' me':'')+'">'
     +'<div class="lb-rank" style="color:'+rc+'">'+(i+1)+'</div>'
     +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(x.t.name)+'</div>'
     +'<div style="flex:1;min-width:0">'
-    +'<div class="lb-name">'+x.t.name+(isMyTeam?' <span style="font-size:12px;color:var(--g)">(my team)</span>':'')+'</div>'
+    +'<div class="lb-name">'+displayName+(isMyTeam?' <span style="font-size:12px;color:var(--g)">(my team)</span>':'')+'</div>'
     +'<div class="lb-sub">'+x.members.length+' members'+(x.weightMembers&&x.weightMembers.length>0?' · '+(x.teamGoalMet?'<span style="color:var(--g)">avg 5% met!</span>':x.avgPctLost.toFixed(1)+'% avg'):' · 0% avg')+'</div>'
     +(maxPts!==null?'<div class="prog"><div class="prog-f" style="width:'+barW+'%"></div></div>':'')
     +'</div>'
