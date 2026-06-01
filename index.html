@@ -261,6 +261,20 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   </div>
 </div>
 
+<!-- ══ MAINTENANCE SCREEN ══ -->
+<div id="scr-maintenance" class="scr" style="justify-content:center;align-items:center;padding:2rem;text-align:center">
+  <div style="max-width:320px">
+    <div style="font-size:56px;margin-bottom:1rem">🔧</div>
+    <div style="font-family:var(--head);font-size:28px;font-weight:700;color:var(--g);margin-bottom:.5rem;text-transform:uppercase">Under Maintenance</div>
+    <div style="font-size:16px;color:var(--tx2);line-height:1.7;margin-bottom:1.5rem">We're making some improvements. The app will be back shortly.<br><br>
+    <span style="color:var(--tx3);font-size:14px">Contact your admin if you need assistance.</span></div>
+    <div style="background:var(--card);border:1px solid var(--bdr-gold);border-radius:var(--r);padding:1rem">
+      <div style="font-size:13px;color:var(--tx3);margin-bottom:.5rem">Are you an admin?</div>
+      <button class="btn btn-g" style="height:44px;font-size:15px" onclick="showScr('scr-auth')">Admin sign in</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PENDING SCREEN ══ -->
 <div id="scr-pending" class="scr">
   <div class="topbar">
@@ -754,7 +768,16 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <input class="inp" type="date" id="ms-startdate">
     <div style="font-size:15px;color:var(--tx3);margin-top:4px">Used to calculate weekly deadlines (each week ends on Sunday)</div>
   </div>
-  <div class="field"><div class="flabel">Current week (1–13)</div><input class="inp" id="ms-wk" type="number" min="1" max="13"></div>
+  <div class="field">
+    <div class="flabel">Maintenance mode</div>
+    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-maint-label">
+      <input type="checkbox" id="ms-maintenance" onchange="document.getElementById('ms-maint-label').style.borderColor=this.checked?'var(--danger)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--danger)">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--tx)">🔧 Maintenance mode</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Only admins can access the app. All other users see a maintenance page.</div>
+      </div>
+    </label>
+  </div>
   <div class="field"><div class="flabel">Entry fee ($)</div><input class="inp" id="ms-fee" type="number" step="0.01" min="1"></div>
   <button class="btn btn-g" onclick="saveSettings()">Save settings</button>
 </div></div>
@@ -915,10 +938,18 @@ async function loadSession(user){
     if(!PROFILE){ err.textContent = 'No profile found — run migrations first'; err.style.color='var(--danger)'; sessionLoading=false; return; }
     if(PROFILE.role === 'pending'){
       await loadData();
+      // Check maintenance mode
+      if(SETTINGS.maintenance_mode && PROFILE.role !== 'admin'){
+        showScr('scr-maintenance'); sessionLoading=false; return;
+      }
       launchParticipant();
       sessionLoading=false; return;
     }
     await loadData();
+    // Non-admins see maintenance screen if enabled
+    if(SETTINGS.maintenance_mode && PROFILE.role !== 'admin'){
+      showScr('scr-maintenance'); sessionLoading=false; return;
+    }
     if(PROFILE.role === 'admin') launchAdmin();
     else if(PROFILE.role === 'challenge_manager') launchChmgr();
     else if(PROFILE.role === 'devotion_leader') launchDevldr();
@@ -2166,16 +2197,21 @@ function openSettingsModal(){
   document.getElementById('ms-wk').value = SETTINGS.current_week;
   document.getElementById('ms-fee').value = SETTINGS.entry_fee;
   document.getElementById('ms-startdate').value = SETTINGS.challenge_start_date||'';
+  var maint = !!SETTINGS.maintenance_mode;
+  document.getElementById('ms-maintenance').checked = maint;
+  document.getElementById('ms-maint-label').style.borderColor = maint?'var(--danger)':'var(--bdr)';
   openModal('m-settings');
 }
 async function saveSettings(){
   var wk = parseInt(document.getElementById('ms-wk').value);
   var fee = parseFloat(document.getElementById('ms-fee').value);
   var startDate = document.getElementById('ms-startdate').value||null;
+  var maintenance = document.getElementById('ms-maintenance').checked;
   if(wk<1||wk>13||isNaN(fee)||fee<=0) return;
-  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, updated_at:new Date().toISOString()}).eq('id',1);
+  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, updated_at:new Date().toISOString()}).eq('id',1);
   closeModal('m-settings');
-  toast('Settings saved!'); await refreshCurrentTab();
+  toast(maintenance?'🔧 Maintenance mode ON':'Settings saved!');
+  await refreshCurrentTab();
 }
 
 // ── PROFILE MODAL ─────────────────────────────────────────────────────────────
