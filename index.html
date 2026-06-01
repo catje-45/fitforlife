@@ -837,28 +837,36 @@ async function refreshSession(){
 var isLoadingSession = false;
 
 async function loadSession(user){
-  if(isLoadingSession) return;
+  if(isLoadingSession) { console.log('loadSession already running, skipping'); return; }
   isLoadingSession = true;
   var err = document.getElementById('li-err');
+  var show = function(msg, isErr){
+    err.textContent = msg;
+    err.style.color = isErr ? 'var(--danger)' : 'var(--g)';
+    console.log(msg);
+  };
   try {
+    show('Step 1: Got user, fetching profile...');
     USER = user;
     var profRes = await sb.from('profiles').select('*').eq('id', user.id).single();
-    if(profRes.error){ err.textContent = 'Profile error: '+profRes.error.message; err.style.color='var(--danger)'; isLoadingSession=false; return; }
+    if(profRes.error){ show('Profile error: '+profRes.error.message, true); isLoadingSession=false; return; }
     PROFILE = profRes.data;
-    if(!PROFILE){ err.textContent = 'No profile found — run migrations first'; err.style.color='var(--danger)'; isLoadingSession=false; return; }
+    if(!PROFILE){ show('No profile found — run migrations first', true); isLoadingSession=false; return; }
+    show('Step 2: Profile loaded, role: '+PROFILE.role+'. Loading data...');
     if(PROFILE.role === 'pending'){
       await loadData();
+      show('Step 3: Launching app...');
       launchParticipant();
       isLoadingSession=false; return;
     }
     await loadData();
+    show('Step 3: Launching app...');
     if(PROFILE.role === 'admin') launchAdmin();
     else if(PROFILE.role === 'challenge_manager') launchChmgr();
     else if(PROFILE.role === 'devotion_leader') launchDevldr();
     else launchParticipant();
   } catch(e){
-    err.textContent = 'Error: ' + e.message;
-    err.style.color = 'var(--danger)';
+    show('Error: ' + e.message, true);
     console.error('loadSession error:', e);
   }
   isLoadingSession = false;
@@ -2704,6 +2712,7 @@ async function saveNewPassword(){
   // Listen for PASSWORD_RECOVERY event FIRST before anything else
   // This fires when user clicks the reset link in their email
   sb.auth.onAuthStateChange(async function(event, session){
+    console.log('Auth event:', event, session ? 'session exists' : 'no session');
     if(event === 'PASSWORD_RECOVERY'){
       // Don't log them in — show reset form instead
       showScr('scr-auth');
