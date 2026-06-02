@@ -1556,6 +1556,10 @@ function renderAdminChallenges(){
     +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Challenges</span>'
     +'<button class="btn-sm btn-sm-g" onclick="openChallengeModal()">+ Challenge</button>'
     +'</div>';
+
+  var totalPending = SUBMISSIONS.filter(function(s){ return s.status==='pending'; }).length;
+  if(totalPending) html += '<div style="background:var(--warndim);border:1px solid rgba(240,192,48,.2);border-radius:var(--rs);padding:.6rem 1rem;margin-bottom:.75rem;font-size:16px;color:var(--warn)">&#9203; '+totalPending+' submission'+(totalPending!==1?'s':'')+' pending review</div>';
+
   if(!CHALLENGES.length){ html += '<div class="empty"><span class="empty-icon">&#127885;</span>No challenges yet</div>'; }
   var byWeek = {};
   CHALLENGES.forEach(function(ch){ if(!byWeek[ch.week]) byWeek[ch.week]=[]; byWeek[ch.week].push(ch); });
@@ -1565,20 +1569,71 @@ function renderAdminChallenges(){
     byWeek[w].forEach(function(ch){
       var d = ch.pts===1?{l:'Easy',cls:'tg'}:ch.pts===2?{l:'Medium',cls:'tblue'}:{l:'Hard',cls:'tgold'};
       var chSubs = SUBMISSIONS.filter(function(s){ return s.challenge_id===ch.id; });
-      var pending = chSubs.filter(function(s){ return s.status==='pending'; }).length;
-      html += '<div class="chi" style="flex-direction:column;align-items:flex-start;gap:8px">'
-        +'<div style="display:flex;align-items:center;gap:8px;width:100%">'
-        +'<div class="chi-text">'+ch.description+'</div>'
+      var pending = chSubs.filter(function(s){ return s.status==='pending'; });
+      var approved = chSubs.filter(function(s){ return s.status==='approved'; });
+      var rejected = chSubs.filter(function(s){ return s.status==='rejected'; });
+
+      html += '<div style="border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:.625rem;overflow:hidden">'
+        // Challenge header
+        +'<div style="display:flex;align-items:center;gap:8px;padding:.75rem;background:var(--bg3)">'
+        +'<div class="chi-text" style="flex:1">'+ch.description+'</div>'
         +'<span class="tag '+d.cls+'">'+d.l+'</span>'
-        +'<span class="tag tgray">+'+ch.pts+'</span>'
-        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" style="margin-left:auto" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>':'')
-        +'</div>'
-        +(chSubs.length?'<div style="display:flex;align-items:center;gap:8px;width:100%">'
-          +'<span style="font-size:16px;color:var(--tx3)">'+chSubs.length+' submission'+(chSubs.length!==1?'s':'')+(pending?' · <span style="color:var(--warn)">'+pending+' pending</span>':'')+'</span>'
-          +'<button class="btn-sm btn-sm-ghost" style="font-size:11px;margin-left:auto" onclick="openReviewModal(\''+ch.id+'\')">Review</button>'
-          +'</div>'
-        :'<div style="font-size:12px;color:var(--tx4)">No submissions yet</div>')
+        +'<span class="tag tgray">+'+ch.pts+'pt</span>'
+        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>':'')
         +'</div>';
+
+      if(!chSubs.length){
+        html += '<div style="font-size:15px;color:var(--tx3);padding:.6rem .875rem">No submissions yet</div>';
+      } else {
+        // Summary bar
+        html += '<div style="display:flex;gap:6px;padding:.5rem .875rem;border-top:1px solid var(--bdr);border-bottom:'+(pending.length?'1px solid var(--bdr)':'none')+'">'
+          +(pending.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:13px">&#9203; '+pending.length+' pending</span>':'')
+          +(approved.length?'<span class="tag tg" style="font-size:13px">&#10003; '+approved.length+'</span>':'')
+          +(rejected.length?'<span class="tag tred" style="font-size:13px">&#10007; '+rejected.length+'</span>':'')
+          +'</div>';
+
+        // Pending submissions
+        pending.forEach(function(s){
+          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+          var c = tc(ti<0?0:ti);
+          html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openReviewModal(\''+ch.id+'\')">'
+            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+            +'<div style="flex:1;min-width:0">'
+            +'<div style="font-size:17px;font-weight:600">'+m.full_name+'</div>'
+            +(s.caption?'<div style="font-size:14px;color:var(--tx3);font-style:italic">'+s.caption+'</div>':'')
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
+            +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewSubmission(\''+s.id+'\',\'approved\');setTimeout(function(){refreshCurrentTab()},400)">&#10003;</button>'
+            +'<button class="btn-sm btn-sm-danger" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewSubmission(\''+s.id+'\',\'rejected\');setTimeout(function(){refreshCurrentTab()},400)">&#10007;</button>'
+            +'</div></div>';
+        });
+
+        // Approved submissions
+        approved.forEach(function(s){
+          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+          var c = tc(ti<0?0:ti);
+          html += '<div class="row-item" style="opacity:.75;border-bottom:1px solid var(--bdr)">'
+            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+m.full_name+'</div></div>'
+            +'<span class="tag tg" style="flex-shrink:0">&#10003; Approved</span>'
+            +'</div>';
+        });
+
+        // Rejected submissions
+        rejected.forEach(function(s){
+          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+          var c = tc(ti<0?0:ti);
+          html += '<div class="row-item" style="opacity:.6">'
+            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+m.full_name+'</div></div>'
+            +'<span class="tag tred" style="flex-shrink:0">&#10007; Rejected</span>'
+            +'</div>';
+        });
+      }
+      html += '</div>';
     });
     html += '</div>';
   });
