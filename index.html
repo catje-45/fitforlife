@@ -469,6 +469,23 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div class="err" id="mas-err"></div>
 </div></div>
 
+<!-- Edit Weight Log -->
+<div class="modal-bg" id="m-edit-log"><div class="modal">
+  <div class="modal-head"><span class="modal-title">⚖️ Edit weight entry</span><button class="modal-x" onclick="closeModal('m-edit-log')">✕</button></div>
+  <div id="el-info" style="font-size:15px;color:var(--tx3);margin-bottom:1rem"></div>
+  <div class="field">
+    <div class="flabel">Starting weight (kg)</div>
+    <input class="inp" id="el-start" type="number" step="0.1" placeholder="e.g. 80.0">
+    <div style="font-size:12px;color:var(--tx3);margin-top:3px">Changing this recalculates % lost for all weeks</div>
+  </div>
+  <div class="field">
+    <div class="flabel">Current weight this week (kg)</div>
+    <input class="inp" id="el-weight" type="number" step="0.1" placeholder="e.g. 74.2">
+  </div>
+  <button class="btn btn-g" onclick="saveEditLog()">Save changes</button>
+  <div class="err" id="el-err"></div>
+</div></div>
+
 <!-- Log Weight -->
 <div class="modal-bg" id="m-log"><div class="modal">
   <div class="modal-head"><span class="modal-title">⚖️ Log weekly weight</span><button class="modal-x" onclick="closeModal('m-log')">✕</button></div>
@@ -586,10 +603,16 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <div class="field"><div class="flabel">Content / Reading</div>
       <textarea class="inp" id="dp-content" rows="4" placeholder="Paste or type the devotional reading…" style="height:auto;padding:12px 13px;resize:none;line-height:1.6"></textarea>
     </div>
-    <div class="field"><div class="flabel">Points</div>
-      <select class="inp" id="dp-pts">
-        <option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option>
-      </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><div class="flabel">Points</div>
+        <select class="inp" id="dp-pts">
+          <option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option>
+        </select>
+      </div>
+      <div class="field"><div class="flabel">Deadline time</div>
+        <input class="inp" type="time" id="dp-deadline" value="23:59">
+        <div style="font-size:11px;color:var(--tx3);margin-top:3px">Default: midnight</div>
+      </div>
     </div>
     <button class="btn btn-g" onclick="saveDailyDevot()">Post devotional</button>
   </div>
@@ -712,10 +735,16 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div class="field"><div class="flabel">Content / Reading</div>
     <textarea class="inp" id="ed-content" rows="5" style="height:auto;padding:12px 13px;resize:none;line-height:1.6"></textarea>
   </div>
-  <div class="field"><div class="flabel">Points</div>
-    <select class="inp" id="ed-pts">
-      <option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option>
-    </select>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="field"><div class="flabel">Points</div>
+      <select class="inp" id="ed-pts">
+        <option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option>
+      </select>
+    </div>
+    <div class="field"><div class="flabel">Deadline time</div>
+      <input class="inp" type="time" id="ed-deadline" value="23:59">
+      <div style="font-size:11px;color:var(--tx3);margin-top:3px">Default: midnight</div>
+    </div>
   </div>
   <button class="btn btn-g" onclick="saveEditDevot()">Save changes</button>
   <div class="err" id="ed-err"></div>
@@ -1105,7 +1134,7 @@ function renderAdminMembers(){
       +'<span style="font-family:var(--head);font-size:20px;font-weight:700">'+t.name+'</span>'
       +'<span class="tag tgray">'+members.length+' member'+(members.length!==1?'s':'')+'</span>'
       +'</div>'
-      +'<button class="btn-sm btn-sm-danger" onclick="removeTeam(\''+t.id+'\')">Remove</button>'
+      +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" onclick="removeTeam(\''+t.id+'\')">Remove</button>':'')
       +'</div>';
     members.forEach(function(m){
       var ptd = getIndPts().find(function(x){ return x.p.id===m.id; })||{total:0,latestPct:0};
@@ -1124,7 +1153,7 @@ function renderAdminMembers(){
         )
         +'<div style="font-size:15px;color:var(--tx3)">'+ptd.total.toFixed(1)+' pts</div></div>'
         +'<button class="btn-sm btn-sm-ghost" style="margin-left:4px;padding:0 8px" onclick="openAssignModal(\''+m.id+'\',\''+esc(m.full_name)+'\')">Edit</button>'
-        +'<button class="btn-sm btn-sm-danger" style="margin-left:4px;padding:0 8px" onclick="removeParticipant(\''+m.id+'\',\''+esc(m.full_name)+'\')">✕</button>'
+        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" style="margin-left:4px;padding:0 8px" onclick="removeParticipant(\''+m.id+'\',\''+esc(m.full_name)+'\')">✕</button>':'')
         +'</div>';
     });
     if(!members.length) html += '<div style="font-size:18px;color:var(--tx3);padding:.4rem 0">No members yet</div>';
@@ -1152,10 +1181,11 @@ function renderAdminLog(){
       html += '<div class="row-item">'
         +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:14px">'+initials(m.full_name)+'</div>'
         +'<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:500">'+m.full_name+'</div>'
-        +'<div style="font-size:15px;color:var(--tx3)">'+l.weight+'kg'+(l.devot_pts?' · Devot.':'')+(l.challenge_pts?' · Chall. +'+l.challenge_pts:'')+'</div></div>'
+        +'<div style="font-size:15px;color:var(--tx3)">'+l.weight+'kg · start: '+(m.start_weight||'?')+'kg'+(l.devot_pts?' · Devot.':'')+(l.challenge_pts?' · Chall. +'+l.challenge_pts:'')+'</div></div>'
         +'<div style="text-align:right;flex-shrink:0"><div style="font-size:18px;font-weight:500;color:'+pc+'">'+l.pct_lost.toFixed(1)+'%</div>'
         +'<div style="font-size:15px;color:var(--tx3)">'+l.total_pts.toFixed(1)+' pts</div></div>'
-        +'<button class="btn-sm btn-sm-danger" style="margin-left:6px" onclick="deleteLog(\''+l.id+'\')">&#10005;</button>'
+        +'<button class="btn-sm btn-sm-ghost" style="margin-left:6px" onclick="openEditLogModal(\''+l.id+'\',\''+m.id+'\')">Edit</button>'
+        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" style="margin-left:4px" onclick="deleteLog(\''+l.id+'\')">&#10005;</button>':'')
         +'</div>';
     });
     html += '</div>';
@@ -1186,7 +1216,7 @@ function renderAdminDevot(){
         +'<div style="font-size:16px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+myDailyResponse.reflection+'"</div>';
       if(myDailyResponse.status==='rejected') html += '<button class="btn btn-g" style="height:38px;font-size:13px;margin-top:.75rem" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">Resubmit</button>';
     } else {
-      html += '<div style="font-size:16px;color:var(--tx2);margin-bottom:.75rem">&#9200; Closes midnight · <span style="color:var(--gold)">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+'</span></div>'
+      html += '<div style="font-size:16px;color:var(--tx2);margin-bottom:.75rem">&#9200; Closes: '+(todayDevot.deadline?new Date(todayDevot.deadline).toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'}):'midnight')+' · <span style="color:var(--gold)">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+'</span></div>'
         +'<button class="btn btn-g" style="height:42px;font-size:15px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write my reflection</button>';
     }
     html += '</div>';
@@ -1318,7 +1348,7 @@ function renderAdminDevot(){
         +'</div></div>'
         +'<div style="display:flex;gap:6px;flex-shrink:0">'
         +'<button class="btn-sm btn-sm-ghost" onclick="event.stopPropagation();openEditDevotModal(\''+d.id+'\')">Edit</button>'
-        +'<button class="btn-sm btn-sm-danger" onclick="event.stopPropagation();removeDailyDevot(\''+d.id+'\')">&#10005;</button>'
+        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" onclick="event.stopPropagation();removeDailyDevot(\''+d.id+'\')">&#10005;</button>':'')
         +'</div>'
         +'</div>';
     });
@@ -1376,7 +1406,7 @@ function renderAdminChallenges(){
         +'<div class="chi-text">'+ch.description+'</div>'
         +'<span class="tag '+d.cls+'">'+d.l+'</span>'
         +'<span class="tag tgray">+'+ch.pts+'</span>'
-        +'<button class="btn-sm btn-sm-danger" style="margin-left:auto" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>'
+        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" style="margin-left:auto" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>':'')
         +'</div>'
         +(chSubs.length?'<div style="display:flex;align-items:center;gap:8px;width:100%">'
           +'<span style="font-size:16px;color:var(--tx3)">'+chSubs.length+' submission'+(chSubs.length!==1?'s':'')+(pending?' · <span style="color:var(--warn)">'+pending+' pending</span>':'')+'</span>'
@@ -1736,7 +1766,7 @@ function renderPartDevot(){
       +'<div style="font-size:18px;color:var(--tx2);line-height:1.65;margin-bottom:.875rem;border-left:3px solid var(--bdr2);padding-left:.75rem">'+todayDevot.content+'</div>'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
       +'<span class="tag tgold">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+'</span>'
-      +'<span style="font-size:15px;color:var(--tx3)">&#9200; Closes at midnight</span></div>'
+      +'<span style="font-size:15px;color:var(--tx3)">&#9200; Closes: '+(todayDevot.deadline?new Date(todayDevot.deadline).toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'}):'midnight')+'</span></div>'
       +'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write reflection</button>';
   }
   html += '</div>';
@@ -2161,6 +2191,42 @@ async function removeParticipant(pid, name){
   toast(name+' removed from challenge');
   await refreshCurrentTab();
 }
+var editingLogId = null;
+var editingLogMemberId = null;
+
+function openEditLogModal(logId, memberId){
+  var l = LOGS.find(function(x){ return x.id===logId; });
+  var m = MEMBERS.find(function(x){ return x.id===memberId; });
+  if(!l||!m) return;
+  editingLogId = logId;
+  editingLogMemberId = memberId;
+  document.getElementById('el-info').textContent = m.full_name+' — Week '+l.week;
+  document.getElementById('el-start').value = m.start_weight||'';
+  document.getElementById('el-weight').value = l.weight;
+  document.getElementById('el-err').textContent = '';
+  openModal('m-edit-log');
+}
+
+async function saveEditLog(){
+  var startWt = parseFloat(document.getElementById('el-start').value);
+  var curWt = parseFloat(document.getElementById('el-weight').value);
+  var err = document.getElementById('el-err');
+  if(isNaN(curWt)||curWt<=0){ err.textContent='Enter a valid current weight'; return; }
+  if(isNaN(startWt)||startWt<=0){ err.textContent='Enter a valid starting weight'; return; }
+  // Update starting weight on profile
+  var profRes = await sb.from('profiles').update({ start_weight: startWt }).eq('id', editingLogMemberId);
+  if(profRes.error){ err.textContent='Profile error: '+profRes.error.message; return; }
+  // Recalculate pct_lost for this log entry
+  var pctLost = parseFloat(((startWt - curWt) / startWt * 100).toFixed(2));
+  var l = LOGS.find(function(x){ return x.id===editingLogId; });
+  var totalPts = parseFloat((Math.max(pctLost,0) + (l?l.devot_pts:0) + (l?l.challenge_pts:0)).toFixed(2));
+  var logRes = await sb.from('logs').update({ weight: curWt, pct_lost: pctLost, total_pts: totalPts }).eq('id', editingLogId);
+  if(logRes.error){ err.textContent='Log error: '+logRes.error.message; return; }
+  closeModal('m-edit-log');
+  toast('Weight entry updated ✓');
+  await refreshCurrentTab();
+}
+
 async function saveLog(){
   var pid = document.getElementById('ml-p').value;
   var week = parseInt(document.getElementById('ml-w').value);
@@ -2494,7 +2560,7 @@ function openWeeklyReview(subId){
     :'<div style="font-size:18px;color:var(--tx3);text-align:center;padding:.5rem 0">'+(sub.status==='approved'?'Approved · '+sub.pts_awarded+' pt'+(sub.pts_awarded>1?'s':'')+' awarded':'Rejected')+'</div>')
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.75rem;border-top:1px solid var(--bdr);padding-top:.75rem">'
     +'<button class="btn btn-ghost" style="height:40px;font-size:15px" onclick="openEditWeeklyDevot(\''+sub.id+'\')">&#9998; Edit</button>'
-    +'<button class="btn btn-danger" style="height:40px;font-size:15px" onclick="deleteWeeklyDevot(\''+sub.id+'\')">&#128465; Delete</button>'
+    +(PROFILE&&PROFILE.role==='admin'?'<button class="btn btn-danger" style="height:40px;font-size:15px" onclick="deleteWeeklyDevot(\''+sub.id+'\')">&#128465; Delete</button>':'')
     +'</div>';
   openModal('m-weekly-review');
 }
@@ -2567,6 +2633,21 @@ function openDailyArchive(devotId){
     +'<div style="font-size:16px;color:var(--tx3);margin-bottom:4px">'+formatDate(d.date)+' · +'+d.pts+' pt'+(d.pts>1?'s':'')+'</div>'
     +'<div style="font-size:18px;color:var(--tx2);line-height:1.6">'+d.content+'</div>'
     +'</div>';
+
+  // Show devo leader's own submission preview
+  if(PROFILE && PROFILE.role === 'devotion_leader'){
+    var myResponse = responses.find(function(r){ return r.participant_id===PROFILE.id; });
+    if(myResponse){
+      var mysc = myResponse.status==='approved'?'tg':myResponse.status==='rejected'?'tred':'tgray';
+      html += '<div style="border:1.5px solid var(--bdr2);border-radius:var(--rs);padding:.875rem;margin-bottom:.875rem;background:var(--gdim)">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">'
+        +'<div style="font-size:15px;font-weight:600;color:var(--g)">&#9997; My submission</div>'
+        +'<span class="tag '+mysc+'">'+(myResponse.status==='approved'?'&#10003; Approved':myResponse.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
+        +'</div>'
+        +'<div style="font-size:16px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+myResponse.reflection+'"</div>'
+        +'</div>';
+    }
+  }
   if(!responses.length){
     html += '<div class="empty" style="padding:1.5rem 0"><span class="empty-icon">&#128203;</span>No responses submitted</div>';
   } else {
@@ -2688,6 +2769,13 @@ function openEditDevotModal(devotId){
   document.getElementById('ed-title').value = d.title;
   document.getElementById('ed-content').value = d.content;
   document.getElementById('ed-pts').value = d.pts;
+  // Load deadline time — default to 23:59 if not set
+  var deadlineTime = '23:59';
+  if(d.deadline){
+    var dt = new Date(d.deadline);
+    deadlineTime = dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  }
+  document.getElementById('ed-deadline').value = deadlineTime;
   document.getElementById('ed-err').textContent = '';
   openModal('m-edit-devot');
 }
@@ -2695,10 +2783,13 @@ async function saveEditDevot(){
   var title = document.getElementById('ed-title').value.trim();
   var content = document.getElementById('ed-content').value.trim();
   var pts = parseInt(document.getElementById('ed-pts').value);
+  var deadlineTime = document.getElementById('ed-deadline').value||'23:59';
   var err = document.getElementById('ed-err');
   if(!title){ err.textContent='Enter a title'; return; }
   if(!content){ err.textContent='Enter the content'; return; }
-  var res = await sb.from('daily_devotionals').update({ title:title, content:content, pts:pts }).eq('id', editingDevotId);
+  var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===editingDevotId; });
+  var deadlineDt = (d?d.date:localDateStr())+'T'+deadlineTime+':00';
+  var res = await sb.from('daily_devotionals').update({ title:title, content:content, pts:pts, deadline:deadlineDt }).eq('id', editingDevotId);
   if(res.error){ err.textContent=res.error.message; return; }
   closeModal('m-edit-devot');
   toast('Devotional updated! &#9998;');
@@ -2738,11 +2829,13 @@ async function saveDailyDevot(){
   var title = document.getElementById('dp-title').value.trim();
   var content = document.getElementById('dp-content').value.trim();
   var pts = parseInt(document.getElementById('dp-pts').value);
+  var deadlineTime = document.getElementById('dp-deadline').value||'23:59';
   var err = document.getElementById('dp-err');
   if(!date){ err.textContent='Select a date'; return; }
   if(!title){ err.textContent='Enter a title'; return; }
   if(!content){ err.textContent='Enter the content'; return; }
-  var res = await sb.from('daily_devotionals').upsert({date:date, title:title, content:content, pts:pts},{onConflict:'date'});
+  var deadlineDt = date+'T'+deadlineTime+':00';
+  var res = await sb.from('daily_devotionals').upsert({date:date, title:title, content:content, pts:pts, deadline:deadlineDt},{onConflict:'date'});
   if(res.error){ err.textContent=res.error.message; return; }
   closeModal('m-daily-post'); toast('Daily devotional posted!');
   await refreshCurrentTab();
@@ -2838,7 +2931,14 @@ async function saveDailyReflection(){
   if(words<30){ err.textContent='At least 30 words required ('+words+' so far)'; return; }
   if(!currentDailyDevotId){ err.textContent='No devotional selected'; return; }
   var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===currentDailyDevotId; });
-  if(devot&&devot.date!==localDateStr()){ err.textContent='This devotional is only open today'; return; }
+  // Check deadline — use stored deadline or default to end of day
+  var deadline = devot&&devot.deadline ? new Date(devot.deadline) : null;
+  if(!deadline && devot) {
+    deadline = new Date(devot.date+'T23:59:59');
+  }
+  if(deadline && new Date() > deadline){
+    err.textContent='The submission deadline has passed for this devotional'; return;
+  }
   var btn = document.getElementById('dr-submit-btn');
   btn.disabled=true; btn.style.opacity='.45';
   var res = await sb.from('daily_responses').upsert({participant_id:PROFILE.id, devotional_id:currentDailyDevotId, reflection:reflection, status:'pending'},{onConflict:'participant_id,devotional_id'});
