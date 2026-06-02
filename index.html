@@ -1597,7 +1597,7 @@ function renderAdminChallenges(){
           var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
           var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
           var mc = tc(mti<0?0:mti);
-          html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openReviewModal(\''+ch.id+'\')">'
+          html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="viewSubmission(\''+s.id+'\')">'
             +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
             +'<div style="flex:1;min-width:0">'
             +'<div style="font-size:17px;font-weight:600">'+mem.full_name+'</div>'
@@ -1614,7 +1614,7 @@ function renderAdminChallenges(){
           var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
           var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
           var mc = tc(mti<0?0:mti);
-          html += '<div class="row-item" style="opacity:.75;border-bottom:1px solid var(--bdr)">'
+          html += '<div class="row-item" style="opacity:.75;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="viewSubmission(\''+s.id+'\')">'
             +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
             +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+mem.full_name+'</div></div>'
             +'<span class="tag tg" style="flex-shrink:0">&#10003; Approved</span>'
@@ -1626,7 +1626,7 @@ function renderAdminChallenges(){
           var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
           var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
           var mc = tc(mti<0?0:mti);
-          html += '<div class="row-item" style="opacity:.6">'
+          html += '<div class="row-item" style="opacity:.6;cursor:pointer" onclick="viewSubmission(\''+s.id+'\')">'
             +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
             +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+mem.full_name+'</div></div>'
             +'<span class="tag tred" style="flex-shrink:0">&#10007; Rejected</span>'
