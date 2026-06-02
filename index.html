@@ -1298,15 +1298,37 @@ function renderAdminLog(){
 }
 
 // ── ADMIN: DEVOTIONALS ────────────────────────────────────────────────────────
+var devotTab = 'daily';
+function switchDevotTab(tab){
+  devotTab = tab;
+  document.getElementById('dt-daily').classList.toggle('on', tab==='daily');
+  document.getElementById('dt-weekly').classList.toggle('on', tab==='weekly');
+  document.getElementById('devot-daily-section').style.display = tab==='daily'?'block':'none';
+  document.getElementById('devot-weekly-section').style.display = tab==='weekly'?'block':'none';
+}
+
 function renderAdminDevot(){
   var today = localDateStr();
   var todayDevot = DAILY_DEVOTIONALS.find(function(d){ return d.date===today; });
   var pendingDR = DAILY_RESPONSES.filter(function(r){ return r.status==='pending'; });
   var pendingWds = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.status==='pending'; });
-  var html = '<div style="padding-bottom:1rem"><div class="section-head">'
+
+  var html = '<div style="padding-bottom:1rem">'
+    +'<div class="section-head">'
     +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Devotionals</span>'
-    +'<button class="btn-sm btn-sm-g" onclick="openDailyPostModal()">+ Post daily</button>'
-    +'</div>';
+    +'<button class="btn-sm btn-sm-g" onclick="openDailyPostModal()">+ Post</button>'
+    +'</div>'
+    // Tab switcher
+    +'<div style="display:flex;background:var(--bg3);border-radius:var(--rxs);padding:3px;margin-bottom:1rem;border:1px solid var(--bdr)">'
+    +'<button class="auth-tab on" id="dt-daily" onclick="switchDevotTab(\'daily\')" style="height:36px;font-size:14px">'
+    +'Daily '+(pendingDR.length?'<span style="background:var(--warn);color:#000;border-radius:8px;padding:0 5px;font-size:11px">'+pendingDR.length+'</span>':'')
+    +'</button>'
+    +'<button class="auth-tab" id="dt-weekly" onclick="switchDevotTab(\'weekly\')" style="height:36px;font-size:14px">'
+    +'Weekly '+(pendingWds.length?'<span style="background:var(--warn);color:#000;border-radius:8px;padding:0 5px;font-size:11px">'+pendingWds.length+'</span>':'')
+    +'</button>'
+    +'</div>'
+    // Daily section
+    +'<div id="devot-daily-section">';
 
   // ── MY DAILY REFLECTION (personal, for admin/devldr as participant) ──
   var myDailyResponse = todayDevot ? DAILY_RESPONSES.find(function(r){ return r.devotional_id===todayDevot.id&&r.participant_id===PROFILE.id; }) : null;
@@ -1441,6 +1463,31 @@ function renderAdminDevot(){
   html += '</div>';
 
   // Weekly devot submissions
+  html += '</div><div id="devot-weekly-section" style="display:none">';
+
+  // ── MY WEEKLY SUBMISSION ──
+  var myWdsSub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.participant_id===PROFILE.id&&s.week===SETTINGS.current_week; });
+  var weekExpired = isWeekExpired(SETTINGS.current_week);
+  var deadlineStr = getWeekDeadline(SETTINGS.current_week);
+  html += '<div class="c" style="border-color:var(--bdr2)">'
+    +'<div class="c-title" style="color:var(--g)">&#128218; My weekly devotional — Week '+SETTINGS.current_week+'</div>';
+  if(myWdsSub){
+    var wsc2 = myWdsSub.status==='approved'?'tg':myWdsSub.status==='rejected'?'tred':'tgray';
+    var wsl2 = myWdsSub.status==='approved'?'&#10003; Approved · +'+( myWdsSub.pts_awarded||1)+' pt'+(( myWdsSub.pts_awarded||1)>1?'s':''):myWdsSub.status==='rejected'?'&#10007; Rejected':'&#9203; Pending review';
+    var submittedAt2 = myWdsSub.created_at ? new Date(myWdsSub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    html += '<span class="tag '+wsc2+'" style="margin-bottom:.5rem;display:inline-block">'+wsl2+'</span>'
+      +'<div style="font-size:15px;color:var(--tx3);margin-bottom:.5rem">Submitted: '+submittedAt2+'</div>';
+    if(myWdsSub.status==='rejected'&&!weekExpired) html += '<button class="btn btn-g" style="height:38px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>';
+  } else if(weekExpired){
+    html += '<div style="font-size:15px;color:var(--danger)">&#128274; Deadline passed · '+deadlineStr+'</div>';
+  } else {
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+      +'<div style="font-size:15px;color:var(--tx2)">&#9200; Deadline: <span style="color:var(--warn);font-weight:600">'+deadlineStr+'</span></div>'
+      +'<button class="btn-sm btn-sm-g" onclick="openWeeklyDevotModal()">Submit</button>'
+      +'</div>';
+  }
+  html += '</div>';
+
   html += '<div class="c"><div class="section-head"><div class="c-title" style="margin:0">&#128218; Weekly devotionals</div>'
     +(pendingWds.length?'<span class="tag" style="background:var(--warndim);color:var(--warn)">&#9203; '+pendingWds.length+' pending</span>':'<span class="tag tg">All reviewed</span>')
     +'</div>';
@@ -1547,7 +1594,8 @@ function renderAdminDevot(){
     html += '</div>';
   }
 
-  return html + '</div>';
+  // Close weekly section div + outer div
+  return html + '</div></div>';
 }
 
 // ── ADMIN: CHALLENGES ─────────────────────────────────────────────────────────
@@ -3009,9 +3057,12 @@ function updateWeekDayLabels(){
     var dateStr = '';
     var existing = null;
     if(startStr){
-      var d = new Date(startStr+'T00:00:00');
-      d.setDate(d.getDate()+i);
-      dateStr = d.toISOString().slice(0,10);
+      // Parse date parts directly to avoid timezone issues
+      var parts = startStr.split('-');
+      var yr = parseInt(parts[0]), mo = parseInt(parts[1])-1, dy = parseInt(parts[2]);
+      var d = new Date(yr, mo, dy+i);
+      var pad = function(n){ return n.toString().padStart(2,'0'); };
+      dateStr = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
       dateLabel = d.toLocaleDateString('en-NZ',{day:'numeric',month:'short'});
       existing = DAILY_DEVOTIONALS.find(function(x){ return x.date===dateStr; });
     }
@@ -3126,9 +3177,11 @@ async function saveWeekDevotionals(){
     var title = document.getElementById('dp-w'+i+'-title').value.trim();
     var content = document.getElementById('dp-w'+i+'-content').value.trim();
     if(!title || !content) return; // skip empty days
-    var d = new Date(startStr+'T00:00:00');
-    d.setDate(d.getDate()+i);
-    var dateStr = d.toISOString().slice(0,10);
+    var parts = startStr.split('-');
+    var yr = parseInt(parts[0]), mo = parseInt(parts[1])-1, dy = parseInt(parts[2]);
+    var d = new Date(yr, mo, dy+i);
+    var pad = function(n){ return n.toString().padStart(2,'0'); };
+    var dateStr = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
     // Check if a devotional already exists for this date
     var existing = DAILY_DEVOTIONALS.find(function(x){ return x.date===dateStr; });
     if(existing){
