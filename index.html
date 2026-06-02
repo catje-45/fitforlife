@@ -319,7 +319,7 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Devotion
     </button>
     <button class="nvb" id="an-subs" onclick="adminTab('subs')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Submissions
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Devot Subs
     </button>
     <button class="nvb" id="an-ch" onclick="adminTab('challenges')">
       <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
@@ -384,7 +384,7 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Manage
     </button>
     <button class="nvb" id="dln-subs" onclick="devldrTab('subs')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Submissions
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Devot Subs
     </button>
   </nav>
 </div>
@@ -1117,7 +1117,7 @@ function renderSubmissionsTab(){
 
   var html = '<div style="padding-bottom:1rem">'
     +'<div class="section-head">'
-    +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Submissions</span>'
+    +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Devotional Submissions</span>'
     +'<div style="display:flex;gap:5px">'
     +(totalPending?'<span class="tag" style="background:var(--warndim);color:var(--warn)">&#9203; '+totalPending+' pending</span>':'')
     +'<span class="tag tg">&#10003; '+totalApproved+'</span>'
@@ -2676,10 +2676,33 @@ async function openReviewModal(challengeId){
   viewSubmission(sub.id);
 }
 async function reviewSubmission(subId, status){
+  var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
   var res = await sb.from('challenge_submissions').update({status:status}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
+  if(status==='approved' && sub){
+    var ch = CHALLENGES.find(function(c){ return c.id===sub.challenge_id; });
+    var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
+    if(ch && mem){
+      var week = ch.week;
+      var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===week; });
+      if(existing){
+        var newChPts = existing.challenge_pts + ch.pts;
+        var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
+        var newTotal = parseFloat((weightPts + existing.devot_pts + newChPts).toFixed(2));
+        await sb.from('logs').update({challenge_pts:newChPts, total_pts:newTotal}).eq('id',existing.id);
+      } else {
+        var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+        await sb.from('logs').insert({
+          participant_id:sub.participant_id, week:week,
+          weight:wt, pct_lost:0,
+          devot_pts:0, challenge_pts:ch.pts,
+          total_pts:ch.pts
+        });
+      }
+    }
+  }
   closeModal('m-view-sub');
-  toast(status==='approved'?'Approved! &#10003;':'Rejected');
+  toast(status==='approved'?'Approved! +pts added &#10003;':'Rejected');
   await refreshCurrentTab();
 }
 
@@ -2871,15 +2894,24 @@ async function reviewWeeklyDevot(subId, status, pts){
   if(!sub) return;
   var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:pts||null}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
-  if(status==='approved'&&pts>0){
-    var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===sub.week; });
-    if(existing){
-      var nd = existing.devot_pts+pts;
-      var nt = parseFloat((Math.max(existing.pct_lost,0)+nd+existing.challenge_pts).toFixed(2));
-      await sb.from('logs').update({devot_pts:nd, total_pts:nt}).eq('id',existing.id);
-    } else {
-      var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
-      if(mem&&mem.start_weight) await sb.from('logs').insert({participant_id:sub.participant_id, week:sub.week, weight:mem.start_weight, pct_lost:0, devot_pts:pts, challenge_pts:0, total_pts:pts});
+  if(status==='approved' && pts>0){
+    var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
+    if(mem){
+      var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===sub.week; });
+      if(existing){
+        var newDevotPts = existing.devot_pts + pts;
+        var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
+        var newTotal = parseFloat((weightPts + newDevotPts + existing.challenge_pts).toFixed(2));
+        await sb.from('logs').update({devot_pts:newDevotPts, total_pts:newTotal}).eq('id',existing.id);
+      } else {
+        var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+        await sb.from('logs').insert({
+          participant_id:sub.participant_id, week:sub.week,
+          weight:wt, pct_lost:0,
+          devot_pts:pts, challenge_pts:0,
+          total_pts:pts
+        });
+      }
     }
   }
   closeModal('m-weekly-review');
@@ -3217,16 +3249,25 @@ async function reviewDailyResponse(id, status){
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved'){
     var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===resp.devotional_id; });
-    if(devot){
+    var mem = MEMBERS.find(function(x){ return x.id===resp.participant_id; });
+    if(devot && mem){
       var week = SETTINGS.current_week;
       var existing = LOGS.find(function(l){ return l.participant_id===resp.participant_id&&l.week===week; });
       if(existing){
-        var nc = existing.challenge_pts+devot.pts;
-        var nt2 = parseFloat((Math.max(existing.pct_lost,0)+existing.devot_pts+nc).toFixed(2));
-        await sb.from('logs').update({challenge_pts:nc, total_pts:nt2}).eq('id',existing.id);
+        var newDevotPts = existing.devot_pts + devot.pts;
+        var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
+        var newTotal = parseFloat((weightPts + newDevotPts + existing.challenge_pts).toFixed(2));
+        await sb.from('logs').update({devot_pts:newDevotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
-        var mem2 = MEMBERS.find(function(x){ return x.id===resp.participant_id; });
-        if(mem2&&mem2.start_weight) await sb.from('logs').insert({participant_id:resp.participant_id, week:week, weight:mem2.start_weight, pct_lost:0, devot_pts:0, challenge_pts:devot.pts, total_pts:devot.pts});
+        // No log yet — create one (weight 0 for devot-only, or start weight for full)
+        var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+        var pct = 0;
+        await sb.from('logs').insert({
+          participant_id:resp.participant_id, week:week,
+          weight:wt, pct_lost:pct,
+          devot_pts:devot.pts, challenge_pts:0,
+          total_pts:devot.pts
+        });
       }
     }
   }
