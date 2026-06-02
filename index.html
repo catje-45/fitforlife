@@ -318,6 +318,9 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb" id="an-devot" onclick="adminTab('devot')">
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Devotion
     </button>
+    <button class="nvb" id="an-subs" onclick="adminTab('subs')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Submissions
+    </button>
     <button class="nvb" id="an-ch" onclick="adminTab('challenges')">
       <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
     </button>
@@ -379,6 +382,9 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     </button>
     <button class="nvb" id="dln-devot" onclick="devldrTab('devot')">
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Manage
+    </button>
+    <button class="nvb" id="dln-subs" onclick="devldrTab('subs')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Submissions
     </button>
   </nav>
 </div>
@@ -1061,6 +1067,7 @@ async function adminTab(tab){
   else if(tab==='log') c.innerHTML = renderAdminLog();
   else if(tab==='lb') c.innerHTML = renderAdminLb();
   else if(tab==='devot') c.innerHTML = renderAdminDevot();
+  else if(tab==='subs') c.innerHTML = renderSubmissionsTab();
   else if(tab==='challenges') c.innerHTML = renderAdminChallenges();
   else if(tab==='prizes') c.innerHTML = renderAdminPrizes();
 }
@@ -1090,6 +1097,97 @@ function renderAdminDash(){
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openChallengeModal()">+ Challenge</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openSettingsModal()">&#9881; Settings</button>'
     +'</div></div>';
+  return html + '</div>';
+}
+
+// ── SUBMISSIONS TAB ───────────────────────────────────────────────────────────
+function renderSubmissionsTab(){
+  var html = '<div style="padding-bottom:1rem">'
+    +'<div class="section-head">'
+    +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Daily Submissions</span>'
+    +'<div style="display:flex;gap:5px">'
+    +'<span class="tag" style="background:var(--warndim);color:var(--warn)">&#9203; '+DAILY_RESPONSES.filter(function(r){return r.status==='pending';}).length+' pending</span>'
+    +'<span class="tag tg">&#10003; '+DAILY_RESPONSES.filter(function(r){return r.status==='approved';}).length+'</span>'
+    +'</div></div>';
+
+  if(!DAILY_DEVOTIONALS.length){
+    html += '<div class="empty"><span class="empty-icon">&#128203;</span>No devotionals posted yet</div>';
+    return html + '</div>';
+  }
+
+  // Sort devotionals newest first
+  var sorted = DAILY_DEVOTIONALS.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+
+  sorted.forEach(function(d){
+    var responses = DAILY_RESPONSES.filter(function(r){ return r.devotional_id===d.id; });
+    var pending = responses.filter(function(r){ return r.status==='pending'; });
+    var approved = responses.filter(function(r){ return r.status==='approved'; });
+    var rejected = responses.filter(function(r){ return r.status==='rejected'; });
+    var isToday = d.date === localDateStr();
+
+    html += '<div class="c">'
+      +'<div class="section-head" style="margin-bottom:.75rem">'
+      +'<div>'
+      +'<div style="font-family:var(--head);font-size:18px;font-weight:700;color:var(--tx)">'
+      +(isToday?'<span style="color:var(--g)">Today — </span>':'')+formatDate(d.date)+'</div>'
+      +'<div style="font-size:15px;color:var(--tx3);margin-top:2px">'+d.title+' · +'+d.pts+'pt</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">'
+      +(pending.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:13px">&#9203; '+pending.length+'</span>':'')
+      +(approved.length?'<span class="tag tg" style="font-size:13px">&#10003; '+approved.length+'</span>':'')
+      +(!responses.length?'<span class="tag tgray" style="font-size:13px">No submissions</span>':'')
+      +'</div></div>';
+
+    if(!responses.length){
+      html += '<div style="font-size:15px;color:var(--tx3);padding:.25rem 0 .5rem">No reflections submitted yet</div>';
+    } else {
+      // Pending first
+      pending.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        html += '<div class="row-item" style="cursor:pointer;border-left:3px solid var(--warn)" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:17px;font-weight:600">'+m.full_name+'</div>'
+          +'<div style="font-size:13px;color:var(--tx3)">'+submittedAt+'</div>'
+          +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
+          +'</div>'
+          +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
+          +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');setTimeout(function(){refreshCurrentTab()},400)">&#10003;</button>'
+          +'<button class="btn-sm btn-sm-danger" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\');setTimeout(function(){refreshCurrentTab()},400)">&#10007;</button>'
+          +'</div></div>';
+      });
+      // Approved
+      approved.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        html += '<div class="row-item" style="cursor:pointer;opacity:.8" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:17px;font-weight:600">'+m.full_name+'</div>'
+          +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
+          +'</div>'
+          +'<span class="tag tg" style="flex-shrink:0;margin-left:8px">&#10003;</span>'
+          +'</div>';
+      });
+      // Rejected
+      rejected.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        html += '<div class="row-item" style="cursor:pointer;opacity:.6" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+m.full_name+'</div></div>'
+          +'<span class="tag tred" style="flex-shrink:0;margin-left:8px">&#10007;</span>'
+          +'</div>';
+      });
+    }
+    html += '</div>';
+  });
+
   return html + '</div>';
 }
 
@@ -1303,7 +1401,7 @@ function renderAdminDevot(){
     // Approved
     if(approvedDR.length){
       html += '<div style="font-family:var(--head);font-size:13px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.07em;padding:.6rem 0 .3rem;margin-top:'+(pendingDR.length?'.5rem':'0')+'">&#10003; Approved ('+approvedDR.length+')</div>';
-      approvedDR.slice(0,10).forEach(function(r){
+      approvedDR.forEach(function(r){
         var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
         var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?'};
         var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
@@ -1319,7 +1417,6 @@ function renderAdminDevot(){
           +'<span class="tag tg" style="flex-shrink:0;margin-left:8px;font-size:13px">&#10003;</span>'
           +'</div>';
       });
-      if(approvedDR.length>10) html += '<div style="font-size:14px;color:var(--tx3);padding:.4rem 0;text-align:center">+' +(approvedDR.length-10)+' more — view in past devotionals</div>';
     }
 
     // Rejected
@@ -1592,8 +1689,9 @@ async function devldrTab(tab){
   if(tab==='stats') c.innerHTML = renderPartStats();
   else if(tab==='ch') c.innerHTML = renderPartChallenges();
   else if(tab==='lb') c.innerHTML = renderPartLb();
-  // Leader tab — full devotion management
+  // Leader tabs
   else if(tab==='devot') c.innerHTML = renderAdminDevot();
+  else if(tab==='subs') c.innerHTML = renderSubmissionsTab();
 }
 
 // ── LAUNCH PARTICIPANT ────────────────────────────────────────────────────────
