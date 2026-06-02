@@ -1594,13 +1594,13 @@ function renderAdminChallenges(){
 
         // Pending submissions
         pending.forEach(function(s){
-          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
-          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
-          var c = tc(ti<0?0:ti);
+          var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
+          var mc = tc(mti<0?0:mti);
           html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openReviewModal(\''+ch.id+'\')">'
-            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+            +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
             +'<div style="flex:1;min-width:0">'
-            +'<div style="font-size:17px;font-weight:600">'+m.full_name+'</div>'
+            +'<div style="font-size:17px;font-weight:600">'+mem.full_name+'</div>'
             +(s.caption?'<div style="font-size:14px;color:var(--tx3);font-style:italic">'+s.caption+'</div>':'')
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
@@ -1611,24 +1611,24 @@ function renderAdminChallenges(){
 
         // Approved submissions
         approved.forEach(function(s){
-          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
-          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
-          var c = tc(ti<0?0:ti);
+          var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
+          var mc = tc(mti<0?0:mti);
           html += '<div class="row-item" style="opacity:.75;border-bottom:1px solid var(--bdr)">'
-            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
-            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+m.full_name+'</div></div>'
+            +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+mem.full_name+'</div></div>'
             +'<span class="tag tg" style="flex-shrink:0">&#10003; Approved</span>'
             +'</div>';
         });
 
         // Rejected submissions
         rejected.forEach(function(s){
-          var m = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
-          var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
-          var c = tc(ti<0?0:ti);
+          var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
+          var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
+          var mc = tc(mti<0?0:mti);
           html += '<div class="row-item" style="opacity:.6">'
-            +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
-            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+m.full_name+'</div></div>'
+            +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+mem.full_name+'</div></div>'
             +'<span class="tag tred" style="flex-shrink:0">&#10007; Rejected</span>'
             +'</div>';
         });
