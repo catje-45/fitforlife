@@ -750,6 +750,12 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div class="err" id="ed-err"></div>
 </div></div>
 
+<!-- Daily Response View Modal -->
+<div class="modal-bg" id="m-daily-response-view"><div class="modal">
+  <div class="modal-head"><span class="modal-title" id="m-drv-title">&#9997; Reflection</span><button class="modal-x" onclick="closeModal('m-daily-response-view')">&#10005;</button></div>
+  <div id="m-drv-body"></div>
+</div></div>
+
 <!-- Daily Devotional Archive Modal -->
 <div class="modal-bg" id="m-daily-archive"><div class="modal">
   <div class="modal-head"><span class="modal-title" id="m-daily-archive-title">&#128214; Devotional responses</span><button class="modal-x" onclick="closeModal('m-daily-archive')">&#10005;</button></div>
@@ -1258,22 +1264,84 @@ function renderAdminDevot(){
   html += '</div>';
 
   // Daily pending responses
-  if(pendingDR.length){
-    html += '<div class="c"><div class="c-title" style="color:var(--warn)">Daily responses — '+pendingDR.length+' pending</div>';
-    pendingDR.slice(0,8).forEach(function(r){
-      var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?'};
-      var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?'};
-      html += '<div class="row-item">'
-        +'<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:500">'+m.full_name+'</div>'
-        +'<div style="font-size:15px;color:var(--tx3)">'+d.title+' · '+formatDate(d.date)+'</div>'
-        +'<div style="font-size:16px;color:var(--tx2);margin-top:2px;font-style:italic">"'+r.reflection.slice(0,80)+(r.reflection.length>80?'...':'')+'"</div></div>'
-        +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;margin-left:8px">'
-        +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'approved\')">&#10003;</button>'
-        +'<button class="btn-sm btn-sm-danger" style="height:28px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'rejected\')">&#10007;</button>'
-        +'</div></div>';
-    });
-    html += '</div>';
+  // Daily responses — pending + approved, grouped
+  var approvedDR = DAILY_RESPONSES.filter(function(r){ return r.status==='approved'; });
+  var rejectedDR = DAILY_RESPONSES.filter(function(r){ return r.status==='rejected'; });
+
+  html += '<div class="c"><div class="section-head"><div class="c-title" style="margin:0">&#9997; Daily responses</div>'
+    +'<div style="display:flex;gap:5px">'
+    +(pendingDR.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:13px">&#9203; '+pendingDR.length+' pending</span>':'')
+    +(approvedDR.length?'<span class="tag tg" style="font-size:13px">&#10003; '+approvedDR.length+'</span>':'')
+    +'</div></div>';
+
+  if(!DAILY_RESPONSES.length){
+    html += '<div class="empty" style="padding:1rem 0"><span class="empty-icon">&#128203;</span>No responses yet</div>';
+  } else {
+    // Pending first
+    if(pendingDR.length){
+      html += '<div style="font-family:var(--head);font-size:13px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.07em;padding:.4rem 0 .3rem">&#9203; Pending review</div>';
+      pendingDR.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?'};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        html += '<div class="row-item" style="cursor:pointer" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:32px;height:32px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.full_name+'</div>'
+          +'<div style="font-size:14px;color:var(--tx3)">'+d.title+' · '+submittedAt+'</div>'
+          +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
+          +'</div>'
+          +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;margin-left:8px">'
+          +'<button class="btn-sm btn-sm-g" style="height:30px;font-size:13px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\')">&#10003;</button>'
+          +'<button class="btn-sm btn-sm-danger" style="height:30px;font-size:13px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\')">&#10007;</button>'
+          +'</div></div>';
+      });
+    }
+
+    // Approved
+    if(approvedDR.length){
+      html += '<div style="font-family:var(--head);font-size:13px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.07em;padding:.6rem 0 .3rem;margin-top:'+(pendingDR.length?'.5rem':'0')+'">&#10003; Approved ('+approvedDR.length+')</div>';
+      approvedDR.slice(0,10).forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?'};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        html += '<div class="row-item" style="cursor:pointer;opacity:.85" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:32px;height:32px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.full_name+'</div>'
+          +'<div style="font-size:14px;color:var(--tx3)">'+d.title+' · '+submittedAt+'</div>'
+          +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
+          +'</div>'
+          +'<span class="tag tg" style="flex-shrink:0;margin-left:8px;font-size:13px">&#10003;</span>'
+          +'</div>';
+      });
+      if(approvedDR.length>10) html += '<div style="font-size:14px;color:var(--tx3);padding:.4rem 0;text-align:center">+' +(approvedDR.length-10)+' more — view in past devotionals</div>';
+    }
+
+    // Rejected
+    if(rejectedDR.length){
+      html += '<div style="font-family:var(--head);font-size:13px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.07em;padding:.6rem 0 .3rem;margin-top:.25rem">&#10007; Rejected ('+rejectedDR.length+')</div>';
+      rejectedDR.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?'};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        html += '<div class="row-item" style="cursor:pointer;opacity:.75" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:32px;height:32px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.full_name+'</div>'
+          +'<div style="font-size:14px;color:var(--tx3)">'+d.title+'</div>'
+          +'</div>'
+          +'<span class="tag tred" style="flex-shrink:0;margin-left:8px;font-size:13px">&#10007;</span>'
+          +'</div>';
+      });
+    }
   }
+  html += '</div>';
 
   // Weekly devot submissions
   html += '<div class="c"><div class="section-head"><div class="c-title" style="margin:0">&#128218; Weekly devotionals</div>'
@@ -2622,6 +2690,48 @@ async function reviewWeeklyDevot(subId, status, pts){
 }
 
 // ── DAILY DEVOTIONALS ─────────────────────────────────────────────────────────
+function openDailyResponseView(responseId){
+  var r = DAILY_RESPONSES.find(function(x){ return x.id===responseId; });
+  if(!r) return;
+  var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+  var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?',content:'',pts:1};
+  var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+  var c = tc(ti<0?0:ti);
+  var sc = r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray';
+  var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  document.getElementById('m-drv-title').textContent = d.title;
+  var html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">'
+    +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(m.full_name)+'</div>'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font-size:18px;font-weight:600">'+m.full_name+'</div>'
+    +'<div style="font-size:14px;color:var(--tx3)">'+formatDate(d.date)+' · submitted '+submittedAt+'</div>'
+    +'</div>'
+    +'<span class="tag '+sc+'">'+(r.status==='approved'?'&#10003; Approved':r.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
+    +'</div>'
+    // Devotional content
+    +'<div style="background:var(--bg3);border-radius:var(--rs);padding:.75rem 1rem;margin-bottom:.875rem">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--tx3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Devotional</div>'
+    +'<div style="font-size:16px;color:var(--tx2);line-height:1.6">'+d.content.slice(0,200)+(d.content.length>200?'...':'')+'</div>'
+    +'</div>'
+    // Reflection
+    +'<div style="font-size:13px;font-weight:600;color:var(--tx3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Their reflection</div>'
+    +'<div style="font-size:17px;color:var(--tx);line-height:1.7;border-left:3px solid var(--bdr2);padding-left:.875rem;margin-bottom:1rem;font-style:italic">"'+r.reflection+'"</div>';
+
+  // Action buttons for pending
+  if(r.status==='pending'){
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<button class="btn btn-danger" style="height:44px;font-size:15px" onclick="reviewDailyResponse(\''+r.id+'\',\'rejected\');closeModal(\'m-daily-response-view\')">&#10007; Reject</button>'
+      +'<button class="btn btn-g" style="height:44px;font-size:15px" onclick="reviewDailyResponse(\''+r.id+'\',\'approved\');closeModal(\'m-daily-response-view\')">&#10003; Approve</button>'
+      +'</div>';
+  } else {
+    html += '<button class="btn btn-ghost" style="height:40px;font-size:14px" onclick="reviewDailyResponse(\''+r.id+'\',\''+(r.status==='approved'?'rejected':'approved')+'\');closeModal(\'m-daily-response-view\')">'
+      +(r.status==='approved'?'&#10007; Mark as rejected':'&#10003; Mark as approved')+'</button>';
+  }
+
+  document.getElementById('m-drv-body').innerHTML = html;
+  openModal('m-daily-response-view');
+}
+
 // ── DEVOTIONAL ARCHIVE VIEWS ──────────────────────────────────────────────────
 function openDailyArchive(devotId){
   var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===devotId; });
@@ -2743,19 +2853,27 @@ function updateWeekDayLabels(){
   container.innerHTML = '';
   DAY_NAMES.forEach(function(day, i){
     var dateLabel = '';
+    var dateStr = '';
+    var existing = null;
     if(startStr){
       var d = new Date(startStr+'T00:00:00');
       d.setDate(d.getDate()+i);
+      dateStr = d.toISOString().slice(0,10);
       dateLabel = d.toLocaleDateString('en-NZ',{day:'numeric',month:'short'});
+      existing = DAILY_DEVOTIONALS.find(function(x){ return x.date===dateStr; });
     }
+    var borderColor = existing ? 'var(--warn)' : 'var(--bdr)';
     container.innerHTML +=
-      '<div style="border:1px solid var(--bdr);border-radius:var(--rs);padding:.75rem;margin-bottom:.625rem">'
+      '<div style="border:1px solid '+borderColor+';border-radius:var(--rs);padding:.75rem;margin-bottom:.625rem;background:'+(existing?'rgba(240,192,48,.05)':'transparent')+'">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">'
       +'<div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--g)">'+day+'</div>'
-      +(dateLabel?'<div style="font-size:13px;color:var(--tx3)">'+dateLabel+'</div>':'')
+      +'<div style="font-size:13px;color:var(--tx3)">'+dateLabel+(existing?' <span style="color:var(--warn)">⚠️ already posted</span>':'')+'</div>'
       +'</div>'
-      +'<input class="inp" id="dp-w'+i+'-title" placeholder="Title / Scripture" style="margin-bottom:6px">'
-      +'<textarea class="inp" id="dp-w'+i+'-content" rows="3" placeholder="Devotional reading for '+day+'…" style="height:auto;padding:10px 12px;resize:none;line-height:1.5;font-size:14px"></textarea>'
+      +(existing
+        ? '<div style="font-size:13px;color:var(--warn);margin-bottom:.5rem;padding:.5rem;background:rgba(240,192,48,.08);border-radius:var(--rxs)">Already posted: "'+existing.title+'" — use Edit button to update</div>'
+        : '<input class="inp" id="dp-w'+i+'-title" placeholder="Title / Scripture" style="margin-bottom:6px">'
+          +'<textarea class="inp" id="dp-w'+i+'-content" rows="3" placeholder="Devotional reading for '+day+'…" style="height:auto;padding:10px 12px;resize:none;line-height:1.5;font-size:14px"></textarea>'
+      )
       +'</div>';
   });
 }
@@ -2847,8 +2965,10 @@ async function saveWeekDevotionals(){
   var err = document.getElementById('dp-err');
   err.textContent='';
   if(!startStr){ err.textContent='Select a week start date'; return; }
+
   // Collect filled days
   var toPost = [];
+  var skipped = [];
   DAY_NAMES.forEach(function(day, i){
     var title = document.getElementById('dp-w'+i+'-title').value.trim();
     var content = document.getElementById('dp-w'+i+'-content').value.trim();
@@ -2856,14 +2976,30 @@ async function saveWeekDevotionals(){
     var d = new Date(startStr+'T00:00:00');
     d.setDate(d.getDate()+i);
     var dateStr = d.toISOString().slice(0,10);
-    toPost.push({ date:dateStr, title:title, content:content, pts:pts });
+    // Check if a devotional already exists for this date
+    var existing = DAILY_DEVOTIONALS.find(function(x){ return x.date===dateStr; });
+    if(existing){
+      skipped.push(day+' ('+dateStr+') — already has: "'+existing.title+'"');
+    } else {
+      toPost.push({ date:dateStr, title:title, content:content, pts:pts });
+    }
   });
+
+  if(!toPost.length && skipped.length){
+    err.textContent='All days already have devotionals. Edit existing ones using the Edit button.';
+    err.style.color='var(--warn)';
+    return;
+  }
   if(!toPost.length){ err.textContent='Fill in at least one day\'s title and content'; return; }
-  // Post all at once
-  var res = await sb.from('daily_devotionals').upsert(toPost, {onConflict:'date'});
+
+  // Post only new days (insert, no upsert — won't overwrite existing)
+  var res = await sb.from('daily_devotionals').insert(toPost);
   if(res.error){ err.textContent=res.error.message; return; }
+
   closeModal('m-daily-post');
-  toast('Posted '+toPost.length+' devotionals for the week! &#128218;');
+  var msg = 'Posted '+toPost.length+' devotional'+(toPost.length!==1?'s':'')+'!';
+  if(skipped.length) msg += ' ('+skipped.length+' day'+(skipped.length!==1?'s':'')+' skipped — already posted)';
+  toast(msg+' &#128218;');
   await refreshCurrentTab();
 }
 async function removeDailyDevot(id){
