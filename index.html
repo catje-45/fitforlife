@@ -1593,8 +1593,9 @@ function renderAdminMembers(){
       html += '<div class="pending-card">'
         +'<div class="av" style="background:var(--gdim);color:var(--g)">'+initials(p.full_name)+'</div>'
         +'<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.full_name+'</div>'
-        +'<div style="font-size:15px;color:var(--tx3)">'+p.email+'</div></div>'
+        +'<div style="font-size:13px;color:var(--tx3)">'+p.email+'</div></div>'
         +'<button class="btn-sm btn-sm-g" onclick="openAssignModal(\''+p.id+'\',\''+esc(p.full_name)+'\')">Approve</button>'
+        +'<button class="btn-sm btn-sm-danger" style="margin-left:4px" onclick="declineMember(\''+p.id+'\',\''+esc(p.full_name)+'\')">Decline</button>'
         +'</div>';
     });
     html += '</div>';
@@ -2700,6 +2701,21 @@ async function saveTeam(){
   closeModal('m-team'); toast('Team created!');
   await refreshCurrentTab();
 }
+async function declineMember(pid, name){
+  if(!confirm('Decline '+name+'? This will permanently delete their account and they will need to register again.')) return;
+  // Call server-side function to delete auth user (cascades to profile)
+  var res = await sb.rpc('delete_auth_user', { user_id: pid });
+  if(res.error){
+    // Fallback: delete profile only (user can't log in without profile)
+    var profRes = await sb.from('profiles').delete().eq('id', pid);
+    if(profRes.error){ toast('Error: '+profRes.error.message); return; }
+    toast(name+' declined — profile removed. Run decline-member-function.sql in Supabase to enable full auth deletion.');
+  } else {
+    toast(name+' has been declined and their account fully deleted.');
+  }
+  await refreshCurrentTab();
+}
+
 async function removeTeam(id){
   if(!confirm('Remove this team? Members will be unassigned.')) return;
   await sb.from('teams').delete().eq('id',id);
