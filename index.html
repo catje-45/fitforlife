@@ -2643,10 +2643,20 @@ async function saveSubmission(){
   if(upRes.error){ err.textContent=upRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('submit-progress').style.display='none'; return; }
   fill.style.width='75%';
   var urlData = sb.storage.from('challenge-media').getPublicUrl(path);
-  var dbRes = await sb.from('challenge_submissions').upsert({participant_id:PROFILE.id, challenge_id:submittingChallengeId, file_url:urlData.data.publicUrl, file_type:selectedFile.type, file_path:path, caption:caption||null, status:'pending'},{onConflict:'participant_id,challenge_id'});
+  // Never auto-approve — submissions always go through review
+  // (even for admin/challenge_manager to maintain integrity)
+  var dbRes = await sb.from('challenge_submissions').upsert({
+    participant_id:PROFILE.id, challenge_id:submittingChallengeId,
+    file_url:urlData.data.publicUrl, file_type:selectedFile.type,
+    file_path:path, caption:caption||null, status:'pending'
+  },{onConflict:'participant_id,challenge_id'});
   if(dbRes.error){ err.textContent=dbRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('submit-progress').style.display='none'; return; }
   fill.style.width='100%';
-  setTimeout(async function(){ closeModal('m-submit'); toast('Proof submitted!'); await partTab(partCurrentTab); },400);
+  setTimeout(async function(){
+    closeModal('m-submit');
+    toast('Proof submitted! Pending approval &#9203;');
+    await refreshCurrentTab();
+  },400);
 }
 function viewSubmission(subId){
   var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
@@ -2680,6 +2690,11 @@ async function openReviewModal(challengeId){
 }
 async function reviewSubmission(subId, status){
   var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
+  // Block self-approval
+  if(sub && sub.participant_id === PROFILE.id){
+    toast('&#9888; You cannot approve your own submission — ask an admin to review it');
+    return;
+  }
   var res = await sb.from('challenge_submissions').update({status:status}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved' && sub){
@@ -2843,13 +2858,17 @@ function openWeeklyReview(subId){
     +'<img src="'+sub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:220px;object-fit:cover;margin-bottom:.875rem;cursor:pointer" onclick="window.open(\''+sub.screenshot_url+'\',\'_blank\')">'
     +'<div style="font-size:16px;color:var(--tx3);margin-bottom:4px">Reflection</div>'
     +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.65;margin-bottom:1rem">"'+sub.reflection+'"</div>'
-    +(sub.status==='pending'?'<div class="field"><div class="flabel">Points to award</div>'
-    +'<select class="inp" id="wdr-pts"><option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option></select></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.5rem">'
-    +'<button class="btn btn-danger" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'rejected\',0)">&#10007; Reject</button>'
-    +'<button class="btn btn-g" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'approved\',parseInt(document.getElementById(\'wdr-pts\').value))">&#10003; Approve</button>'
-    +'</div>'
-    :'<div style="font-size:18px;color:var(--tx3);text-align:center;padding:.5rem 0">'+(sub.status==='approved'?'Approved · '+sub.pts_awarded+' pt'+(sub.pts_awarded>1?'s':'')+' awarded':'Rejected')+'</div>')
+    +(sub.participant_id===PROFILE.id
+      ? '<div style="padding:.75rem;background:var(--warndim);border:1px solid rgba(240,192,48,.25);border-radius:var(--rs);font-size:15px;color:var(--warn);text-align:center;margin-top:.5rem">&#9888; Ask an admin to review your submission</div>'
+      : sub.status==='pending'
+        ? '<div class="field"><div class="flabel">Points to award</div>'
+          +'<select class="inp" id="wdr-pts"><option value="1">1 pt</option><option value="2">2 pts</option><option value="3">3 pts</option></select></div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.5rem">'
+          +'<button class="btn btn-danger" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'rejected\',0)">&#10007; Reject</button>'
+          +'<button class="btn btn-g" style="height:42px;font-size:15px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'approved\',parseInt(document.getElementById(\'wdr-pts\').value))">&#10003; Approve</button>'
+          +'</div>'
+        : '<div style="font-size:18px;color:var(--tx3);text-align:center;padding:.5rem 0">'+(sub.status==='approved'?'Approved · '+sub.pts_awarded+' pt'+(sub.pts_awarded>1?'s':'')+' awarded':'Rejected')+'</div>'
+    )
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.75rem;border-top:1px solid var(--bdr);padding-top:.75rem">'
     +'<button class="btn btn-ghost" style="height:40px;font-size:15px" onclick="openEditWeeklyDevot(\''+sub.id+'\')">&#9998; Edit</button>'
     +(PROFILE&&PROFILE.role==='admin'?'<button class="btn btn-danger" style="height:40px;font-size:15px" onclick="deleteWeeklyDevot(\''+sub.id+'\')">&#128465; Delete</button>':'')
@@ -2895,6 +2914,11 @@ async function deleteWeeklyDevot(subId){
 async function reviewWeeklyDevot(subId, status, pts){
   var sub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.id===subId; });
   if(!sub) return;
+  // Block self-approval
+  if(sub.participant_id === PROFILE.id){
+    toast('&#9888; You cannot approve your own submission — ask an admin to review it');
+    return;
+  }
   var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:pts||null}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved' && pts>0){
@@ -2950,8 +2974,11 @@ function openDailyResponseView(responseId){
     +'<div style="font-size:13px;font-weight:600;color:var(--tx3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Their reflection</div>'
     +'<div style="font-size:17px;color:var(--tx);line-height:1.7;border-left:3px solid var(--bdr2);padding-left:.875rem;margin-bottom:1rem;font-style:italic">"'+r.reflection+'"</div>';
 
-  // Action buttons for pending
-  if(r.status==='pending'){
+  // Action buttons — hide if viewing own submission
+  var isSelf = r.participant_id === PROFILE.id;
+  if(isSelf){
+    html += '<div style="padding:.75rem;background:var(--warndim);border:1px solid rgba(240,192,48,.25);border-radius:var(--rs);font-size:15px;color:var(--warn);text-align:center">&#9888; Ask an admin to review your submission</div>';
+  } else if(r.status==='pending'){
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
       +'<button class="btn btn-danger" style="height:44px;font-size:15px" onclick="reviewDailyResponse(\''+r.id+'\',\'rejected\');closeModal(\'m-daily-response-view\')">&#10007; Reject</button>'
       +'<button class="btn btn-g" style="height:44px;font-size:15px" onclick="reviewDailyResponse(\''+r.id+'\',\'approved\');closeModal(\'m-daily-response-view\')">&#10003; Approve</button>'
@@ -3248,6 +3275,11 @@ async function removeDailyDevot(id){
 async function reviewDailyResponse(id, status){
   var resp = DAILY_RESPONSES.find(function(r){ return r.id===id; });
   if(!resp) return;
+  // Block self-approval
+  if(resp.participant_id === PROFILE.id){
+    toast('&#9888; You cannot approve your own reflection — ask an admin to review it');
+    return;
+  }
   var res = await sb.from('daily_responses').update({status:status}).eq('id',id);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved'){
