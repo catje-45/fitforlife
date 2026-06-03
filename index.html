@@ -377,17 +377,17 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb on" id="dln-stats" onclick="devldrTab('stats')">
       <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>My Stats
     </button>
+    <button class="nvb" id="dln-devot" onclick="devldrTab('devot')">
+      <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Devotion
+    </button>
     <button class="nvb" id="dln-ch" onclick="devldrTab('ch')">
       <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
     </button>
     <button class="nvb" id="dln-lb" onclick="devldrTab('lb')">
       <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Leaderboard
     </button>
-    <button class="nvb" id="dln-devot" onclick="devldrTab('devot')">
-      <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Manage
-    </button>
-    <button class="nvb" id="dln-subs" onclick="devldrTab('subs')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Devot Subs
+    <button class="nvb" id="dln-manage" onclick="devldrTab('manage')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Manage
     </button>
   </nav>
 </div>
@@ -1211,7 +1211,187 @@ function renderSubmissionsTab(){
   return html + '</div>';
 }
 
-// ── ADMIN: MEMBERS ────────────────────────────────────────────────────────────
+// ── DEVLDR MANAGE TAB ────────────────────────────────────────────────────────
+var devldrManageTab = 'daily';
+var devldrOpenDates = {};
+var devldrOpenWeeks = {};
+
+function switchDevldrTab(tab){
+  devldrManageTab = tab;
+  document.getElementById('dlm-daily-btn').classList.toggle('on', tab==='daily');
+  document.getElementById('dlm-weekly-btn').classList.toggle('on', tab==='weekly');
+  document.getElementById('dlm-daily-section').style.display = tab==='daily'?'block':'none';
+  document.getElementById('dlm-weekly-section').style.display = tab==='weekly'?'block':'none';
+}
+
+function toggleDevldrDate(dateId){
+  devldrOpenDates[dateId] = !devldrOpenDates[dateId];
+  var el = document.getElementById('dlm-rows-'+dateId);
+  var arrow = document.getElementById('dlm-arrow-'+dateId);
+  if(el) el.style.display = devldrOpenDates[dateId]?'block':'none';
+  if(arrow) arrow.style.transform = devldrOpenDates[dateId]?'rotate(90deg)':'rotate(0deg)';
+}
+
+function toggleDevldrWeek(week){
+  devldrOpenWeeks[week] = !devldrOpenWeeks[week];
+  var el = document.getElementById('dlm-wrows-'+week);
+  var arrow = document.getElementById('dlm-warrow-'+week);
+  if(el) el.style.display = devldrOpenWeeks[week]?'block':'none';
+  if(arrow) arrow.style.transform = devldrOpenWeeks[week]?'rotate(90deg)':'rotate(0deg)';
+}
+
+function renderDevldrManage(){
+  var pendingDR = DAILY_RESPONSES.filter(function(r){ return r.status==='pending'; });
+  var pendingWds = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.status==='pending'; });
+
+  var html = '<div style="padding-bottom:1rem">'
+    +'<div class="section-head">'
+    +'<span style="font-family:var(--head);font-size:22px;font-weight:700">Manage Devotionals</span>'
+    +'<button class="btn-sm btn-sm-g" onclick="openDailyPostModal()">+ Post</button>'
+    +'</div>'
+    // Sub-tabs
+    +'<div style="display:flex;background:var(--bg3);border-radius:var(--rxs);padding:3px;margin-bottom:1rem;border:1px solid var(--bdr)">'
+    +'<button class="auth-tab on" id="dlm-daily-btn" onclick="switchDevldrTab(\'daily\')" style="height:36px;font-size:14px">'
+    +'Daily '+(pendingDR.length?'<span style="background:var(--warn);color:#000;border-radius:8px;padding:0 5px;font-size:11px">'+pendingDR.length+'</span>':'')+'</button>'
+    +'<button class="auth-tab" id="dlm-weekly-btn" onclick="switchDevldrTab(\'weekly\')" style="height:36px;font-size:14px">'
+    +'Weekly '+(pendingWds.length?'<span style="background:var(--warn);color:#000;border-radius:8px;padding:0 5px;font-size:11px">'+pendingWds.length+'</span>':'')+'</button>'
+    +'</div>'
+
+    // ── DAILY SECTION ──
+    +'<div id="dlm-daily-section">';
+
+  // Post new + today's devot
+  var today = localDateStr();
+  var todayDevot = DAILY_DEVOTIONALS.find(function(d){ return d.date===today; });
+  html += '<div class="c" style="margin-bottom:.75rem"><div class="section-head" style="margin-bottom:0">'
+    +'<div class="c-title" style="margin:0">Today — '+formatDate(today)+'</div>'
+    +(todayDevot?'<button class="btn-sm btn-sm-ghost" onclick="openEditDevotModal(\''+todayDevot.id+'\')">&#9998; Edit</button>':'')
+    +'</div>';
+  if(todayDevot){
+    html += '<div style="font-size:18px;font-weight:500;color:var(--tx);margin-top:.5rem">'+todayDevot.title+'</div>'
+      +'<div style="font-size:15px;color:var(--tx3)">+'+todayDevot.pts+'pt</div>';
+  } else {
+    html += '<div style="font-size:15px;color:var(--tx3);margin-top:.5rem">No devotional posted today.</div>'
+      +'<button class="btn btn-g" style="height:38px;font-size:14px;margin-top:.625rem" onclick="openDailyPostModal()">+ Post today\'s devotional</button>';
+  }
+  html += '</div>';
+
+  // Daily submissions by date (collapsible)
+  var sorted = DAILY_DEVOTIONALS.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+  sorted.forEach(function(d){
+    var responses = DAILY_RESPONSES.filter(function(r){ return r.devotional_id===d.id; });
+    var pending = responses.filter(function(r){ return r.status==='pending' && r.participant_id!==PROFILE.id; });
+    var approved = responses.filter(function(r){ return r.status==='approved'; });
+    var isToday = d.date===today;
+    var dateId = d.id.replace(/-/g,'');
+    if(devldrOpenDates[dateId]===undefined) devldrOpenDates[dateId] = isToday||pending.length>0;
+    var isOpen = devldrOpenDates[dateId];
+
+    html += '<div class="c" style="padding:0;overflow:hidden;margin-bottom:.5rem">'
+      +'<div onclick="toggleDevldrDate(\''+dateId+'\')" style="display:flex;align-items:center;gap:10px;padding:.875rem;cursor:pointer;'+(isOpen?'border-bottom:1px solid var(--bdr)':'')+'">'
+      +'<span id="dlm-arrow-'+dateId+'" style="font-size:16px;color:var(--tx3);transition:transform .2s;transform:'+(isOpen?'rotate(90deg)':'rotate(0deg)')+'">&#8250;</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-family:var(--head);font-size:17px;font-weight:700;color:'+(isToday?'var(--g)':'var(--tx)')+'">'+(isToday?'Today — ':'')+formatDate(d.date)+'</div>'
+      +'<div style="font-size:13px;color:var(--tx3)">'+d.title+'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;flex-shrink:0">'
+      +(pending.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:12px">&#9203; '+pending.length+'</span>':'')
+      +(approved.length?'<span class="tag tg" style="font-size:12px">&#10003; '+approved.length+'</span>':'')
+      +(!responses.length?'<span class="tag tgray" style="font-size:12px">None</span>':'')
+      +'</div></div>'
+      +'<div id="dlm-rows-'+dateId+'" style="display:'+(isOpen?'block':'none')+'">';
+
+    if(!responses.length){
+      html += '<div style="font-size:15px;color:var(--tx3);padding:.75rem .875rem">No submissions yet</div>';
+    } else {
+      responses.sort(function(a,b){ return a.status==='pending'?-1:b.status==='pending'?1:0; });
+      responses.forEach(function(r){
+        var m = MEMBERS.find(function(x){ return x.id===r.participant_id; })||{full_name:'?',team_id:''};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        var isSelf = r.participant_id===PROFILE.id;
+        var sc = r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray';
+        var submittedAt = r.created_at?new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+        html += '<div class="row-item" style="cursor:pointer;'+(r.status==='pending'&&!isSelf?'border-left:3px solid var(--warn)':'')+'" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:17px;font-weight:600">'+m.full_name+(isSelf?' <span style="font-size:12px;color:var(--g)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:13px;color:var(--tx3)">'+submittedAt+'</div>'
+          +'<div style="font-size:14px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,55)+(r.reflection.length>55?'...':'')+'"</div>'
+          +'</div>'
+          +(r.status==='pending'&&!isSelf
+            ?'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
+              +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');setTimeout(function(){refreshCurrentTab()},400)">&#10003;</button>'
+              +'<button class="btn-sm btn-sm-danger" style="height:26px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\');setTimeout(function(){refreshCurrentTab()},400)">&#10007;</button>'
+              +'</div>'
+            :'<span class="tag '+sc+'" style="flex-shrink:0;margin-left:8px;font-size:12px">'+(r.status==='approved'?'&#10003;':r.status==='rejected'?'&#10007;':'&#9203;')+'</span>'
+          )
+          +'</div>';
+      });
+    }
+    html += '</div></div>';
+  });
+
+  html += '</div>'
+    // ── WEEKLY SECTION ──
+    +'<div id="dlm-weekly-section" style="display:none">';
+
+  var weeks = WEEKLY_DEVOT_SUBS.reduce(function(acc,s){ if(!acc.includes(s.week)) acc.push(s.week); return acc; },[]).sort(function(a,b){ return b-a; });
+
+  if(!weeks.length){
+    html += '<div class="empty"><span class="empty-icon">&#128203;</span>No weekly submissions yet</div>';
+  } else {
+    weeks.forEach(function(w){
+      var subs = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.week===w; });
+      var pending = subs.filter(function(s){ return s.status==='pending'&&s.participant_id!==PROFILE.id; });
+      var approved = subs.filter(function(s){ return s.status==='approved'; });
+      var deadlineStr = getWeekDeadline(w);
+      if(devldrOpenWeeks[w]===undefined) devldrOpenWeeks[w] = pending.length>0||+w===SETTINGS.current_week;
+      var isOpen = devldrOpenWeeks[w];
+
+      html += '<div class="c" style="padding:0;overflow:hidden;margin-bottom:.5rem">'
+        +'<div onclick="toggleDevldrWeek('+w+')" style="display:flex;align-items:center;gap:10px;padding:.875rem;cursor:pointer;'+(isOpen?'border-bottom:1px solid var(--bdr)':'')+'">'
+        +'<span id="dlm-warrow-'+w+'" style="font-size:16px;color:var(--tx3);transition:transform .2s;transform:'+(isOpen?'rotate(90deg)':'rotate(0deg)')+'">&#8250;</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-family:var(--head);font-size:17px;font-weight:700;color:'+(+w===SETTINGS.current_week?'var(--g)':'var(--tx)')+'">Week '+w+(+w===SETTINGS.current_week?' <span style="color:var(--g)">· Current</span>':'')+'</div>'
+        +'<div style="font-size:13px;color:var(--tx3)">Deadline: '+deadlineStr+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:5px;flex-shrink:0">'
+        +(pending.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:12px">&#9203; '+pending.length+'</span>':'')
+        +(approved.length?'<span class="tag tg" style="font-size:12px">&#10003; '+approved.length+'</span>':'')
+        +'</div></div>'
+        +'<div id="dlm-wrows-'+w+'" style="display:'+(isOpen?'block':'none')+'">';
+
+      subs.sort(function(a,b){ return a.status==='pending'?-1:b.status==='pending'?1:0; });
+      subs.forEach(function(sub){
+        var m = MEMBERS.find(function(x){ return x.id===sub.participant_id; })||{full_name:'?',team_id:''};
+        var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
+        var c = tc(ti<0?0:ti);
+        var isSelf = sub.participant_id===PROFILE.id;
+        var sc = sub.status==='approved'?'tg':sub.status==='rejected'?'tred':'tgray';
+        var submittedAt = sub.created_at?new Date(sub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+        html += '<div class="row-item" style="cursor:pointer;'+(sub.status==='pending'&&!isSelf?'border-left:3px solid var(--warn)':'')+'" onclick="openWeeklyReview(\''+sub.id+'\')">'
+          +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:17px;font-weight:600">'+m.full_name+(isSelf?' <span style="font-size:12px;color:var(--g)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:13px;color:var(--tx3)">'+submittedAt+'</div>'
+          +'<div style="font-size:14px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+sub.reflection.slice(0,55)+(sub.reflection.length>55?'...':'')+'"</div>'
+          +'</div>'
+          +(sub.status==='pending'&&!isSelf
+            ?'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
+              +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:12px" onclick="event.stopPropagation();openWeeklyReview(\''+sub.id+'\')">Review</button>'
+              +'</div>'
+            :'<span class="tag '+sc+'" style="flex-shrink:0;margin-left:8px;font-size:12px">'
+              +(sub.status==='approved'?'&#10003; +'+sub.pts_awarded+'pt':sub.status==='rejected'?'&#10007;':'&#9203;')+'</span>'
+          )
+          +'</div>';
+      });
+      html += '</div></div>';
+    });
+  }
+
+  return html + '</div></div>';
+}
 function renderAdminMembers(){
   var html = '<div style="padding-bottom:1rem">';
 
@@ -1790,11 +1970,11 @@ async function devldrTab(tab){
   refreshWeekBadges();
   // Participant tabs
   if(tab==='stats') c.innerHTML = renderPartStats();
+  else if(tab==='devot') c.innerHTML = renderPartDevot();
   else if(tab==='ch') c.innerHTML = renderPartChallenges();
   else if(tab==='lb') c.innerHTML = renderPartLb();
-  // Leader tabs
-  else if(tab==='devot') c.innerHTML = renderAdminDevot();
-  else if(tab==='subs') c.innerHTML = renderSubmissionsTab();
+  // Manage tab
+  else if(tab==='manage') c.innerHTML = renderDevldrManage();
 }
 
 // ── LAUNCH PARTICIPANT ────────────────────────────────────────────────────────
