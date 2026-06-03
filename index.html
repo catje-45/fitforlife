@@ -324,6 +324,9 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb" id="an-prizes" onclick="adminTab('prizes')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Prizes
     </button>
+    <button class="nvb" id="an-archive" onclick="adminTab('archive')">
+      <svg viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive
+    </button>
   </nav>
 </div>
 
@@ -802,6 +805,26 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div class="err" id="rp-err"></div>
 </div></div>
 
+<!-- Archive Round Modal -->
+<div class="modal-bg" id="m-archive"><div class="modal">
+  <div class="modal-head"><span class="modal-title">📦 Archive current round</span><button class="modal-x" onclick="closeModal('m-archive')">✕</button></div>
+  <div style="font-size:15px;color:var(--tx2);line-height:1.6;margin-bottom:1rem">This will copy all current data to the archive, then reset scores and submissions for a fresh start. Member accounts and teams are kept.</div>
+  <div class="field"><div class="flabel">Round label</div>
+    <input class="inp" id="arc-label" placeholder="e.g. Round 1 — June 2026">
+  </div>
+  <div class="field"><div class="flabel">Notes (optional)</div>
+    <input class="inp" id="arc-notes" placeholder="e.g. First 90-day challenge">
+  </div>
+  <div style="background:var(--gdim);border:1px solid var(--bdr2);border-radius:var(--rs);padding:.875rem;margin-bottom:1rem;font-size:14px;color:var(--g)">
+    ✓ Logs, challenge submissions, devotional responses and weekly submissions will be archived<br>
+    ✓ Member accounts, teams and roles are preserved<br>
+    ✓ Starting weights will be cleared for new weigh-ins<br>
+    ✓ Week resets to 1
+  </div>
+  <button class="btn btn-g" onclick="archiveAndReset()">📦 Archive &amp; reset</button>
+  <div class="err" id="arc-err"></div>
+</div></div>
+
 <!-- Settings -->
 <div class="modal-bg" id="m-settings"><div class="modal">
   <div class="modal-head"><span class="modal-title">Settings</span><button class="modal-x" onclick="closeModal('m-settings')">✕</button></div>
@@ -1068,6 +1091,7 @@ async function adminTab(tab){
   else if(tab==='devot') c.innerHTML = renderDevldrManage();
   else if(tab==='challenges') c.innerHTML = renderAdminChallenges();
   else if(tab==='prizes') c.innerHTML = renderAdminPrizes();
+  else if(tab==='archive') { renderArchiveTab(c); }
 }
 
 // ── ADMIN: DASHBOARD ──────────────────────────────────────────────────────────
@@ -1205,6 +1229,177 @@ function renderSubmissionsTab(){
   });
 
   return html + '</div>';
+}
+
+// ── ARCHIVE TAB ───────────────────────────────────────────────────────────────
+var ARCHIVE_ROUNDS = [];
+
+async function renderArchiveTab(container){
+  container.innerHTML = '<div class="loading"><div class="spin"></div>Loading archives...</div>';
+  var res = await sb.from('archive_rounds').select('*').order('archived_at',{ascending:false});
+  ARCHIVE_ROUNDS = res.data||[];
+  var html = '<div style="padding-bottom:1rem">'
+    +'<div class="section-head">'
+    +'<span style="font-family:var(--head);font-size:22px;font-weight:700">&#128230; Archive</span>'
+    +'<button class="btn-sm btn-sm-g" onclick="openArchiveModal()">+ Archive &amp; Reset</button>'
+    +'</div>';
+  if(!ARCHIVE_ROUNDS.length){
+    html += '<div class="empty"><span class="empty-icon">&#128230;</span><div>No archived rounds yet.</div>'
+      +'<div style="font-size:15px;color:var(--tx3);margin-top:6px">Use Archive &amp; Reset to save the current round before starting a new one.</div></div>';
+  } else {
+    ARCHIVE_ROUNDS.forEach(function(r){
+      var dt = new Date(r.archived_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});
+      html += '<div class="c">'
+        +'<div class="section-head" style="margin-bottom:.5rem">'
+        +'<div><div style="font-family:var(--head);font-size:20px;font-weight:700;color:var(--g)">'+r.label+'</div>'
+        +'<div style="font-size:14px;color:var(--tx3)">Archived '+dt+(r.notes?' · '+r.notes:'')+'</div></div>'
+        +'<button class="btn-sm btn-sm-ghost" onclick="viewArchiveRound(\''+r.id+'\')" id="arc-btn-'+r.id+'">View</button>'
+        +'</div>'
+        +'<div id="arc-round-'+r.id+'"></div>'
+        +'</div>';
+    });
+  }
+  container.innerHTML = html + '</div>';
+}
+
+async function viewArchiveRound(roundId){
+  var el = document.getElementById('arc-round-'+roundId);
+  var btn = document.getElementById('arc-btn-'+roundId);
+  if(el.innerHTML){ el.innerHTML=''; btn.textContent='View'; return; }
+  btn.textContent='Loading...';
+  var results = await Promise.all([
+    sb.from('archive_logs').select('*').eq('round_id',roundId).order('week'),
+    sb.from('archive_challenge_submissions').select('*').eq('round_id',roundId),
+    sb.from('archive_daily_responses').select('*').eq('round_id',roundId),
+    sb.from('archive_weekly_submissions').select('*').eq('round_id',roundId),
+  ]);
+  var logs=results[0].data||[], chSubs=results[1].data||[], drSubs=results[2].data||[], wdsSubs=results[3].data||[];
+  btn.textContent='Hide';
+  var members = {};
+  logs.forEach(function(l){
+    if(!members[l.participant_id]) members[l.participant_id]={name:l.full_name,team:l.team_name,track:l.track_weight,pct:0,devot:0,chall:0};
+    var m=members[l.participant_id];
+    if(l.pct_lost>m.pct) m.pct=l.pct_lost;
+    m.devot+=l.devot_pts; m.chall+=l.challenge_pts;
+  });
+  drSubs.forEach(function(r){ if(!members[r.participant_id]) members[r.participant_id]={name:r.full_name,team:'',track:false,pct:0,devot:0,chall:0}; });
+  var sorted = Object.values(members).sort(function(a,b){
+    var at=parseFloat(((a.track===false?0:a.pct)+a.devot+a.chall).toFixed(1));
+    var bt=parseFloat(((b.track===false?0:b.pct)+b.devot+b.chall).toFixed(1));
+    return bt-at;
+  });
+  var html='<div style="margin-bottom:.5rem">'
+    +'<div class="mg3" style="margin-bottom:.75rem">'
+    +'<div class="met"><div class="met-n">'+sorted.length+'</div><div class="met-l">Participants</div></div>'
+    +'<div class="met"><div class="met-n">'+chSubs.filter(function(s){return s.status==='approved';}).length+'</div><div class="met-l">Challenges ✓</div></div>'
+    +'<div class="met"><div class="met-n">'+drSubs.filter(function(r){return r.status==='approved';}).length+'</div><div class="met-l">Devot ✓</div></div>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">'
+    +'<thead><tr style="background:var(--gd)">'
+    +'<th style="text-align:left;padding:8px 10px;color:white;font-family:var(--head)">#</th>'
+    +'<th style="text-align:left;padding:8px 10px;color:white;font-family:var(--head)">Name</th>'
+    +'<th style="text-align:left;padding:8px 10px;color:white;font-family:var(--head)">Team</th>'
+    +'<th style="text-align:right;padding:8px 10px;color:white;font-family:var(--head)">% Lost</th>'
+    +'<th style="text-align:right;padding:8px 10px;color:white;font-family:var(--head)">Devot</th>'
+    +'<th style="text-align:right;padding:8px 10px;color:white;font-family:var(--head)">Chall</th>'
+    +'<th style="text-align:right;padding:8px 10px;color:white;font-family:var(--head)">Total</th>'
+    +'</tr></thead><tbody>';
+  sorted.forEach(function(m,i){
+    var total=parseFloat(((m.track===false?0:m.pct)+m.devot+m.chall).toFixed(1));
+    html+='<tr style="background:'+(i%2===0?'var(--bg3)':'var(--card)')+'">'
+      +'<td style="padding:7px 10px;color:var(--tx3)">'+(i+1)+'</td>'
+      +'<td style="padding:7px 10px;font-weight:600;color:var(--tx)">'+m.name+'</td>'
+      +'<td style="padding:7px 10px;color:var(--tx3)">'+m.team+'</td>'
+      +'<td style="padding:7px 10px;text-align:right;color:'+(m.pct>=5?'var(--g)':'var(--tx2)')+'">'+
+        (m.track===false?'<span style="color:var(--tx3)">—</span>':m.pct.toFixed(1)+'%')+'</td>'
+      +'<td style="padding:7px 10px;text-align:right;color:var(--tx2)">'+m.devot+'</td>'
+      +'<td style="padding:7px 10px;text-align:right;color:var(--tx2)">'+m.chall+'</td>'
+      +'<td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--gold)">'+total+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function openArchiveModal(){
+  document.getElementById('arc-label').value='Round '+(ARCHIVE_ROUNDS.length+1)+' — '+new Date().toLocaleDateString('en-NZ',{month:'long',year:'numeric'});
+  document.getElementById('arc-notes').value='';
+  document.getElementById('arc-err').textContent='';
+  openModal('m-archive');
+}
+
+async function archiveAndReset(){
+  var label=document.getElementById('arc-label').value.trim();
+  var notes=document.getElementById('arc-notes').value.trim();
+  var err=document.getElementById('arc-err');
+  if(!label){err.textContent='Enter a round label';return;}
+  err.textContent='';
+  var btn=document.querySelector('#m-archive .btn-g');
+  btn.textContent='Archiving...'; btn.disabled=true;
+  try{
+    var rndRes=await sb.from('archive_rounds').insert({label:label,notes:notes||null}).select().single();
+    if(rndRes.error) throw new Error(rndRes.error.message);
+    var rid=rndRes.data.id;
+    // Archive logs
+    if(LOGS.length){
+      var logsData=LOGS.map(function(l){
+        var m=MEMBERS.find(function(x){return x.id===l.participant_id;})||{full_name:'?',team_id:'',track_weight:true};
+        var t=TEAMS.find(function(x){return x.id===m.team_id;})||{name:''};
+        return {round_id:rid,participant_id:l.participant_id,full_name:m.full_name,team_name:t.name,
+          week:l.week,weight:l.weight,pct_lost:l.pct_lost,devot_pts:l.devot_pts,
+          challenge_pts:l.challenge_pts,total_pts:l.total_pts,track_weight:m.track_weight,
+          original_created_at:l.created_at};
+      });
+      await sb.from('archive_logs').insert(logsData);
+    }
+    // Archive challenge submissions
+    if(SUBMISSIONS.length){
+      var chData=SUBMISSIONS.map(function(s){
+        var m=MEMBERS.find(function(x){return x.id===s.participant_id;})||{full_name:'?',team_id:''};
+        var t=TEAMS.find(function(x){return x.id===m.team_id;})||{name:''};
+        var ch=CHALLENGES.find(function(c){return c.id===s.challenge_id;})||{description:'?',week:0,pts:0};
+        return {round_id:rid,participant_id:s.participant_id,full_name:m.full_name,team_name:t.name,
+          challenge_description:ch.description,challenge_week:ch.week,challenge_pts:ch.pts,
+          file_url:s.file_url,caption:s.caption,status:s.status,original_created_at:s.created_at};
+      });
+      await sb.from('archive_challenge_submissions').insert(chData);
+    }
+    // Archive daily responses
+    if(DAILY_RESPONSES.length){
+      var drData=DAILY_RESPONSES.map(function(r){
+        var m=MEMBERS.find(function(x){return x.id===r.participant_id;})||{full_name:'?'};
+        var d=DAILY_DEVOTIONALS.find(function(x){return x.id===r.devotional_id;})||{title:'?',date:''};
+        return {round_id:rid,participant_id:r.participant_id,full_name:m.full_name,
+          devotional_title:d.title,devotional_date:d.date,reflection:r.reflection,
+          status:r.status,original_created_at:r.created_at};
+      });
+      await sb.from('archive_daily_responses').insert(drData);
+    }
+    // Archive weekly submissions
+    if(WEEKLY_DEVOT_SUBS.length){
+      var wdsData=WEEKLY_DEVOT_SUBS.map(function(s){
+        var m=MEMBERS.find(function(x){return x.id===s.participant_id;})||{full_name:'?',team_id:''};
+        var t=TEAMS.find(function(x){return x.id===m.team_id;})||{name:''};
+        return {round_id:rid,participant_id:s.participant_id,full_name:m.full_name,team_name:t.name,
+          week:s.week,reflection:s.reflection,screenshot_url:s.screenshot_url,
+          pts_awarded:s.pts_awarded,status:s.status,original_created_at:s.created_at};
+      });
+      await sb.from('archive_weekly_submissions').insert(wdsData);
+    }
+    // Reset live tables
+    await sb.from('logs').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    await sb.from('challenge_submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    await sb.from('daily_responses').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    await sb.from('weekly_devot_submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    await sb.from('profiles').update({start_weight:null}).in('role',['participant','challenge_manager','devotion_leader','admin']);
+    await sb.from('settings').update({current_week:1}).eq('id',1);
+    closeModal('m-archive');
+    toast('&#128230; Round archived & reset successfully!');
+    await adminTab('archive');
+  } catch(e){
+    err.textContent='Error: '+e.message;
+    btn.textContent='&#128230; Archive & reset'; btn.disabled=false;
+  }
 }
 
 // ── DEVLDR MANAGE TAB ────────────────────────────────────────────────────────
