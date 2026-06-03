@@ -309,20 +309,17 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb on" id="an-dash" onclick="adminTab('dash')">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview
     </button>
+    <button class="nvb" id="an-devot" onclick="adminTab('devot')">
+      <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Devotion
+    </button>
+    <button class="nvb" id="an-ch" onclick="adminTab('challenges')">
+      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
+    </button>
     <button class="nvb" id="an-members" onclick="adminTab('members')">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Members
     </button>
     <button class="nvb" id="an-lb" onclick="adminTab('lb')">
       <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Leaderboard
-    </button>
-    <button class="nvb" id="an-devot" onclick="adminTab('devot')">
-      <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Devotion
-    </button>
-    <button class="nvb" id="an-subs" onclick="adminTab('subs')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Devot Subs
-    </button>
-    <button class="nvb" id="an-ch" onclick="adminTab('challenges')">
-      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
     </button>
     <button class="nvb" id="an-prizes" onclick="adminTab('prizes')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Prizes
@@ -1068,8 +1065,7 @@ async function adminTab(tab){
   else if(tab==='members') c.innerHTML = renderAdminMembers();
   else if(tab==='log') c.innerHTML = renderAdminLog();
   else if(tab==='lb') c.innerHTML = renderAdminLb();
-  else if(tab==='devot') c.innerHTML = renderAdminDevot();
-  else if(tab==='subs') c.innerHTML = renderSubmissionsTab();
+  else if(tab==='devot') c.innerHTML = renderDevldrManage();
   else if(tab==='challenges') c.innerHTML = renderAdminChallenges();
   else if(tab==='prizes') c.innerHTML = renderAdminPrizes();
 }
