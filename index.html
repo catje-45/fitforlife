@@ -352,8 +352,11 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb" id="cmn-lb" onclick="chmgrTab('lb')">
       <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Leaderboard
     </button>
+    <button class="nvb" id="cmn-mych" onclick="chmgrTab('mych')">
+      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Challenges
+    </button>
     <button class="nvb" id="cmn-ch" onclick="chmgrTab('challenges')">
-      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Manage
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Manage
     </button>
   </nav>
 </div>
@@ -1754,6 +1757,7 @@ async function chmgrTab(tab){
   if(tab==='stats') c.innerHTML = renderPartStats();
   else if(tab==='devot') c.innerHTML = renderPartDevot();
   else if(tab==='lb') c.innerHTML = renderPartLb();
+  else if(tab==='mych') c.innerHTML = renderPartChallenges();
   // Manager tab — full challenge management
   else if(tab==='challenges') c.innerHTML = renderAdminChallenges();
 }
