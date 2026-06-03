@@ -834,11 +834,18 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   </div>
   <div class="field">
     <div class="flabel">Maintenance mode</div>
-    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-maint-label">
+    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer;margin-bottom:6px" id="ms-maint-label">
       <input type="checkbox" id="ms-maintenance" onchange="document.getElementById('ms-maint-label').style.borderColor=this.checked?'var(--danger)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--danger)">
       <div>
         <div style="font-size:16px;font-weight:600;color:var(--tx)">🔧 Maintenance mode</div>
-        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Only admins can access the app. All other users see a maintenance page.</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Only team admins can access. All others see a maintenance page.</div>
+      </div>
+    </label>
+    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-readonly-label">
+      <input type="checkbox" id="ms-readonly" onchange="document.getElementById('ms-readonly-label').style.borderColor=this.checked?'var(--warn)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--warn)">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--tx)">👁 Read-only mode</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Everyone can log in and view, but cannot submit devotionals, challenges or reflections.</div>
       </div>
     </label>
   </div>
@@ -2389,7 +2396,9 @@ function renderPartDevot(){
   var todayDevot = DAILY_DEVOTIONALS.find(function(d){ return d.date===today; });
   var myResponse = todayDevot ? DAILY_RESPONSES.find(function(r){ return r.devotional_id===todayDevot.id&&r.participant_id===PROFILE.id; }) : null;
   var myWdsSub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.participant_id===PROFILE.id&&s.week===SETTINGS.current_week; });
+  var roMode = isReadOnly();
   var html = '<div style="padding-bottom:1rem">';
+  if(roMode) html += readOnlyBanner();
 
   // Daily
   html += '<div class="c"><div class="c-title">&#128214; Daily devotional — '+formatDate(today)+'</div>';
@@ -2401,14 +2410,15 @@ function renderPartDevot(){
     html += '<div style="font-size:20px;font-weight:500;margin-bottom:6px">'+todayDevot.title+'</div>'
       +'<span class="tag '+sc+'" style="margin-bottom:.75rem;display:inline-block">'+sl+'</span>'
       +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+myResponse.reflection+'"</div>';
-    if(myResponse.status==='rejected') html += '<button class="btn btn-g" style="margin-top:.75rem;height:42px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">Resubmit reflection</button>';
+    if(myResponse.status==='rejected') html += !roMode?'<button class="btn btn-g" style="margin-top:.75rem;height:42px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">Resubmit reflection</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
   } else {
     html += '<div style="font-size:20px;font-weight:500;color:var(--tx);margin-bottom:6px">'+todayDevot.title+'</div>'
       +'<div style="font-size:18px;color:var(--tx2);line-height:1.65;margin-bottom:.875rem;border-left:3px solid var(--bdr2);padding-left:.75rem">'+todayDevot.content+'</div>'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
       +'<span class="tag tgold">+'+todayDevot.pts+' pt'+(todayDevot.pts>1?'s':'')+'</span>'
       +'<span style="font-size:15px;color:var(--tx3)">&#9200; Closes: '+(todayDevot.deadline?new Date(todayDevot.deadline).toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'}):'midnight')+'</span></div>'
-      +'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write reflection</button>';
+      +(roMode?'<div style="font-size:14px;color:var(--warn);padding:.5rem;background:var(--golddim);border-radius:var(--rs)">&#128274; Submissions disabled in read-only mode</div>'
+        :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write reflection</button>');
   }
   html += '</div>';
 
@@ -2424,7 +2434,7 @@ function renderPartDevot(){
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">Submitted: '+submittedAt+'</div>'
       +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">"'+myWdsSub.reflection+'"</div>';
     if(myWdsSub.screenshot_url) html += '<img src="'+myWdsSub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:180px;object-fit:cover;margin-bottom:.75rem">';
-    if(myWdsSub.status==='rejected' && !weekExpired) html += '<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>';
+    if(myWdsSub.status==='rejected' && !weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
     if(myWdsSub.status==='rejected' && weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed — resubmission closed</div>';
   } else if(weekExpired){
     html += '<div style="text-align:center;padding:1rem 0">'
@@ -2439,7 +2449,8 @@ function renderPartDevot(){
       +'<span style="font-size:16px">&#9200;</span>'
       +'<div style="font-size:13px"><span style="color:var(--tx2)">Deadline: </span><span style="color:var(--warn);font-weight:600">'+deadlineStr+'</span></div>'
       +'</div>'
-      +'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal()">&#128218; Submit reflection + screenshot</button>';
+      +(roMode?'<div style="font-size:14px;color:var(--warn);padding:.5rem;background:var(--golddim);border-radius:var(--rs)">&#128274; Submissions disabled in read-only mode</div>'
+        :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal()">&#128218; Submit reflection + screenshot</button>');
   }
   html += '</div>';
 
@@ -2514,7 +2525,10 @@ function renderPartChallenges(){
     return '<div style="padding-bottom:1rem">'+notStartedCard('Challenges open on the challenge start date.', startStr)+'</div>';
   }
   var cur = CHALLENGES.filter(function(ch){ return ch.week===SETTINGS.current_week; });
-  var html = '<div style="padding-bottom:1rem"><div class="c"><div class="c-title">Week '+SETTINGS.current_week+' challenges</div>';
+  var roMode = isReadOnly();
+  var html = '<div style="padding-bottom:1rem">';
+  if(roMode) html += readOnlyBanner();
+  html += '<div class="c"><div class="c-title">Week '+SETTINGS.current_week+' challenges</div>';
   if(!cur.length) html += '<div class="empty" style="padding:1rem 0"><span class="empty-icon">&#127885;</span>No challenges set yet</div>';
   cur.forEach(function(ch){
     var d = ch.pts===1?{l:'Easy',cls:'tg'}:ch.pts===2?{l:'Medium',cls:'tblue'}:{l:'Hard',cls:'tgold'};
@@ -2529,10 +2543,12 @@ function renderPartChallenges(){
       var sc2 = mySub.status==='approved'?'tg':mySub.status==='rejected'?'tred':'tgray';
       html += '<div style="display:flex;align-items:center;gap:8px;width:100%">'
         +'<span class="tag '+sc2+'" style="font-size:11px">&#10003; Submitted'+(mySub.status==='approved'?' · Approved':mySub.status==='rejected'?' · Rejected':'')+'</span>'
-        +'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>'
+        +(!roMode?'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>':'')
         +'</div>';
     } else {
-      html += '<button class="btn-sm btn-sm-g" style="width:100%;height:36px;font-size:12px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">&#128247; Submit proof</button>';
+      html += !roMode
+        ?'<button class="btn-sm btn-sm-g" style="width:100%;height:36px;font-size:12px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">&#128247; Submit proof</button>'
+        :'<div style="font-size:13px;color:var(--warn);padding:.4rem 0">&#128274; Submissions disabled in read-only mode</div>';
     }
     html += '</div>';
   });
@@ -2939,6 +2955,9 @@ function openSettingsModal(){
   var maint = !!SETTINGS.maintenance_mode;
   document.getElementById('ms-maintenance').checked = maint;
   document.getElementById('ms-maint-label').style.borderColor = maint?'var(--danger)':'var(--bdr)';
+  var ro = !!SETTINGS.read_only_mode;
+  document.getElementById('ms-readonly').checked = ro;
+  document.getElementById('ms-readonly-label').style.borderColor = ro?'var(--warn)':'var(--bdr)';
   openModal('m-settings');
 }
 async function saveSettings(){
@@ -2946,10 +2965,11 @@ async function saveSettings(){
   var fee = parseFloat(document.getElementById('ms-fee').value);
   var startDate = document.getElementById('ms-startdate').value||null;
   var maintenance = document.getElementById('ms-maintenance').checked;
+  var readOnly = document.getElementById('ms-readonly').checked;
   if(wk<1||wk>13||isNaN(fee)||fee<=0) return;
-  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, updated_at:new Date().toISOString()}).eq('id',1);
+  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, read_only_mode:readOnly, updated_at:new Date().toISOString()}).eq('id',1);
   closeModal('m-settings');
-  toast(maintenance?'🔧 Maintenance mode ON':'Settings saved!');
+  toast(maintenance?'🔧 Maintenance mode ON':readOnly?'👁 Read-only mode ON':'Settings saved!');
   await refreshCurrentTab();
 }
 
@@ -3109,6 +3129,13 @@ async function reviewSubmission(subId, status){
   closeModal('m-view-sub');
   toast(status==='approved'?'Approved! +pts added &#10003;':'Rejected');
   await refreshCurrentTab();
+}
+
+function isReadOnly(){
+  return !!(SETTINGS && SETTINGS.read_only_mode) && PROFILE && !['admin','challenge_manager','devotion_leader'].includes(PROFILE.role);
+}
+function readOnlyBanner(){
+  return '<div style="background:var(--golddim);border:1px solid rgba(240,192,48,.3);border-radius:var(--rs);padding:.75rem 1rem;margin-bottom:.875rem;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--gold)">&#128274; Read-only mode — submissions are temporarily disabled. You can still view all content.</div>';
 }
 
 // ── WEEK DEADLINE HELPERS ─────────────────────────────────────────────────────
