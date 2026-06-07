@@ -3549,7 +3549,16 @@ function updateWeekDayLabels(){
       +(existing
         ? '<div style="font-size:13px;color:var(--warn);margin-bottom:.5rem;padding:.5rem;background:rgba(240,192,48,.08);border-radius:var(--rxs)">Already posted: "'+existing.title+'" — use Edit button to update</div>'
         : '<input class="inp" id="dp-w'+i+'-title" placeholder="Title / Scripture" style="margin-bottom:6px">'
-          +'<textarea class="inp" id="dp-w'+i+'-content" rows="3" placeholder="Devotional reading for '+day+'…" style="height:auto;padding:10px 12px;resize:none;line-height:1.5;font-size:14px"></textarea>'
+          +'<textarea class="inp" id="dp-w'+i+'-content" rows="3" placeholder="Devotional reading for '+day+'…" style="height:auto;padding:10px 12px;resize:none;line-height:1.5;font-size:14px;margin-bottom:6px"></textarea>'
+          +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<div style="font-size:13px;color:var(--tx3)">Points:</div>'
+          +'<select class="inp" id="dp-w'+i+'-pts" style="width:auto;padding:4px 8px;height:32px;font-size:13px">'
+          +'<option value="0">Use default</option>'
+          +'<option value="1">1 pt</option>'
+          +'<option value="2">2 pts</option>'
+          +'<option value="3">3 pts</option>'
+          +'</select>'
+          +'</div>'
       )
       +'</div>';
   });
@@ -3660,7 +3669,11 @@ async function saveWeekDevotionals(){
     if(existing){
       skipped.push(day+' ('+dateStr+') — already has: "'+existing.title+'"');
     } else {
-      toPost.push({ date:dateStr, title:title, content:content, pts:pts });
+    // Use per-day points if set, otherwise fall back to default
+    var dayPtsEl = document.getElementById('dp-w'+i+'-pts');
+    var dayPts = dayPtsEl ? parseInt(dayPtsEl.value)||0 : 0;
+    var finalPts = dayPts > 0 ? dayPts : pts;
+    toPost.push({ date:dateStr, title:title, content:content, pts:finalPts });
     }
   });
 
@@ -3700,7 +3713,14 @@ async function reviewDailyResponse(id, status){
     var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===resp.devotional_id; });
     var mem = MEMBERS.find(function(x){ return x.id===resp.participant_id; });
     if(devot && mem){
+      // Derive week from devotional date relative to challenge start date
       var week = SETTINGS.current_week;
+      if(SETTINGS.challenge_start_date && devot.date){
+        var startMs = new Date(SETTINGS.challenge_start_date+'T00:00:00').getTime();
+        var devotMs = new Date(devot.date+'T00:00:00').getTime();
+        var diffWeeks = Math.floor((devotMs - startMs) / (7*24*60*60*1000));
+        if(diffWeeks >= 0) week = Math.min(13, diffWeeks + 1);
+      }
       var existing = LOGS.find(function(l){ return l.participant_id===resp.participant_id&&l.week===week; });
       if(existing){
         var newDevotPts = existing.devot_pts + devot.pts;
@@ -3708,12 +3728,10 @@ async function reviewDailyResponse(id, status){
         var newTotal = parseFloat((weightPts + newDevotPts + existing.challenge_pts).toFixed(2));
         await sb.from('logs').update({devot_pts:newDevotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
-        // No log yet — create one (weight 0 for devot-only, or start weight for full)
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
-        var pct = 0;
         await sb.from('logs').insert({
           participant_id:resp.participant_id, week:week,
-          weight:wt, pct_lost:pct,
+          weight:wt, pct_lost:0,
           devot_pts:devot.pts, challenge_pts:0,
           total_pts:devot.pts
         });
