@@ -3052,28 +3052,76 @@ async function saveSubmission(){
   var btn = document.getElementById('submit-btn');
   var fill = document.getElementById('submit-prog-fill');
   btn.disabled=true; btn.style.opacity='.45';
+  err.textContent='';
   document.getElementById('submit-progress').style.display='block';
-  fill.style.width='30%';
+  fill.style.width='10%';
+
   var ext = selectedFile.name.split('.').pop().toLowerCase();
   var path = 'submissions/'+PROFILE.id+'/'+submittingChallengeId+'/'+Date.now()+'.'+ext;
-  var upRes = await sb.storage.from('challenge-media').upload(path, selectedFile, {cacheControl:'3600',upsert:true,contentType:selectedFile.type});
-  if(upRes.error){ err.textContent=upRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('submit-progress').style.display='none'; return; }
-  fill.style.width='75%';
-  var urlData = sb.storage.from('challenge-media').getPublicUrl(path);
-  // Never auto-approve — submissions always go through review
-  // (even for admin/challenge_manager to maintain integrity)
-  var dbRes = await sb.from('challenge_submissions').upsert({
-    participant_id:PROFILE.id, challenge_id:submittingChallengeId,
-    file_url:urlData.data.publicUrl, file_type:selectedFile.type,
-    file_path:path, caption:caption||null, status:'pending'
-  },{onConflict:'participant_id,challenge_id'});
-  if(dbRes.error){ err.textContent=dbRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('submit-progress').style.display='none'; return; }
-  fill.style.width='100%';
-  setTimeout(async function(){
-    closeModal('m-submit');
-    toast('Proof submitted! Pending approval &#9203;');
-    await refreshCurrentTab();
-  },400);
+
+  // Use fetch directly for better large file support and progress visibility
+  try {
+    var session = await sb.auth.getSession();
+    var token = session.data.session.access_token;
+    var supabaseUrl = 'https://dvicjqbpjalrtspcvnuv.supabase.co';
+    var uploadUrl = supabaseUrl+'/storage/v1/object/challenge-media/'+path;
+
+    fill.style.width='30%';
+
+    // Use XMLHttpRequest for actual upload progress
+    var publicUrl = await new Promise(function(resolve, reject){
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrl);
+      xhr.setRequestHeader('Authorization', 'Bearer '+token);
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.setRequestHeader('Content-Type', selectedFile.type);
+      xhr.upload.onprogress = function(e){
+        if(e.lengthComputable){
+          var pct = Math.round((e.loaded/e.total)*60)+30; // 30-90%
+          fill.style.width = Math.min(pct,90)+'%';
+        }
+      };
+      xhr.onload = function(){
+        if(xhr.status===200||xhr.status===201){
+          resolve(supabaseUrl+'/storage/v1/object/public/challenge-media/'+path);
+        } else {
+          var msg = 'Upload failed';
+          try { msg = JSON.parse(xhr.responseText).message||msg; } catch(e){}
+          reject(new Error(msg));
+        }
+      };
+      xhr.onerror = function(){
+        reject(new Error('Network error — check your connection and try again'));
+      };
+      xhr.ontimeout = function(){
+        reject(new Error('Upload timed out — video may be too large. Try a shorter clip.'));
+      };
+      xhr.timeout = 120000; // 2 minute timeout
+      xhr.send(selectedFile);
+    });
+
+    fill.style.width='92%';
+
+    var dbRes = await sb.from('challenge_submissions').upsert({
+      participant_id:PROFILE.id, challenge_id:submittingChallengeId,
+      file_url:publicUrl, file_type:selectedFile.type,
+      file_path:path, caption:caption||null, status:'pending'
+    },{onConflict:'participant_id,challenge_id'});
+    if(dbRes.error) throw new Error(dbRes.error.message);
+
+    fill.style.width='100%';
+    setTimeout(async function(){
+      closeModal('m-submit');
+      toast('Proof submitted! Pending approval &#9203;');
+      await refreshCurrentTab();
+    },400);
+
+  } catch(e) {
+    err.textContent = e.message||'Upload failed — please try again';
+    btn.disabled=false; btn.style.opacity='1';
+    document.getElementById('submit-progress').style.display='none';
+    fill.style.width='0%';
+  }
 }
 function viewSubmission(subId){
   var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
@@ -3107,7 +3155,6 @@ async function openReviewModal(challengeId){
 }
 async function reviewSubmission(subId, status){
   var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
-  // Block self-approval
   if(sub && sub.participant_id === PROFILE.id){
     toast('&#9888; You cannot approve your own submission — ask an admin to review it');
     return;
@@ -3119,19 +3166,26 @@ async function reviewSubmission(subId, status){
     var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
     if(ch && mem){
       var week = ch.week;
+      // Recalculate challenge_pts from scratch — sum ALL approved challenges for this week
+      var allApprovedCh = await sb.from('challenge_submissions')
+        .select('challenge_id').eq('participant_id', sub.participant_id).eq('status','approved');
+      var approvedChIds = (allApprovedCh.data||[]).map(function(r){ return r.challenge_id; });
+      if(!approvedChIds.includes(sub.challenge_id)) approvedChIds.push(sub.challenge_id);
+      var chPts = 0;
+      for(var k=0; k<approvedChIds.length; k++){
+        var cc = CHALLENGES.find(function(x){ return x.id===approvedChIds[k]; });
+        if(cc && cc.week===week) chPts += cc.pts;
+      }
       var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===week; });
       if(existing){
-        var newChPts = existing.challenge_pts + ch.pts;
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + existing.devot_pts + newChPts).toFixed(2));
-        await sb.from('logs').update({challenge_pts:newChPts, total_pts:newTotal}).eq('id',existing.id);
+        var newTotal = parseFloat((weightPts + existing.devot_pts + chPts).toFixed(2));
+        await sb.from('logs').update({challenge_pts:chPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
         await sb.from('logs').insert({
           participant_id:sub.participant_id, week:week,
-          weight:wt, pct_lost:0,
-          devot_pts:0, challenge_pts:ch.pts,
-          total_pts:ch.pts
+          weight:wt, pct_lost:0, devot_pts:0, challenge_pts:chPts, total_pts:chPts
         });
       }
     }
@@ -3336,35 +3390,48 @@ async function deleteWeeklyDevot(subId){
 async function reviewWeeklyDevot(subId, status, pts){
   var sub = WEEKLY_DEVOT_SUBS.find(function(s){ return s.id===subId; });
   if(!sub) return;
-  // Block self-approval
   if(sub.participant_id === PROFILE.id){
     toast('&#9888; You cannot approve your own submission — ask an admin to review it');
     return;
   }
-  var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:pts||null}).eq('id',subId);
+  var awardedPts = status==='approved' ? 2 : null; // always 2 pts
+  var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:awardedPts}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
-  if(status==='approved' && pts>0){
+  if(status==='approved'){
     var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
     if(mem){
+      // Recalculate devot_pts from scratch for this week
+      var allApprovedDaily = await sb.from('daily_responses')
+        .select('devotional_id').eq('participant_id', sub.participant_id).eq('status','approved');
+      var approvedIds = (allApprovedDaily.data||[]).map(function(r){ return r.devotional_id; });
+      var devotPts = 0;
+      if(SETTINGS.challenge_start_date){
+        var startMs2 = new Date(SETTINGS.challenge_start_date+'T00:00:00').getTime();
+        for(var k=0; k<approvedIds.length; k++){
+          var dd2 = DAILY_DEVOTIONALS.find(function(x){ return x.id===approvedIds[k]; });
+          if(!dd2) continue;
+          var ddMs2 = new Date(dd2.date+'T00:00:00').getTime();
+          var ddWeek2 = Math.min(13, Math.max(1, Math.floor((ddMs2-startMs2)/(7*24*60*60*1000))+1));
+          if(ddWeek2===sub.week) devotPts += dd2.pts;
+        }
+      }
+      devotPts += 2; // weekly approved = always 2 pts
       var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===sub.week; });
       if(existing){
-        var newDevotPts = existing.devot_pts + pts;
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + newDevotPts + existing.challenge_pts).toFixed(2));
-        await sb.from('logs').update({devot_pts:newDevotPts, total_pts:newTotal}).eq('id',existing.id);
+        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
+        await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
         await sb.from('logs').insert({
           participant_id:sub.participant_id, week:sub.week,
-          weight:wt, pct_lost:0,
-          devot_pts:pts, challenge_pts:0,
-          total_pts:pts
+          weight:wt, pct_lost:0, devot_pts:devotPts, challenge_pts:0, total_pts:devotPts
         });
       }
     }
   }
   closeModal('m-weekly-review');
-  toast(status==='approved'?('Approved! +'+pts+' pt'+(pts>1?'s':'')+' &#10003;'):'Rejected');
+  toast(status==='approved'?'Approved! +2pts &#10003;':'Rejected');
   await refreshCurrentTab();
 }
 
@@ -3746,7 +3813,7 @@ async function reviewDailyResponse(id, status){
     var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===resp.devotional_id; });
     var mem = MEMBERS.find(function(x){ return x.id===resp.participant_id; });
     if(devot && mem){
-      // Derive week from devotional date relative to challenge start date
+      // Derive week from devotional date
       var week = SETTINGS.current_week;
       if(SETTINGS.challenge_start_date && devot.date){
         var startMs = new Date(SETTINGS.challenge_start_date+'T00:00:00').getTime();
@@ -3754,19 +3821,50 @@ async function reviewDailyResponse(id, status){
         var diffWeeks = Math.floor((devotMs - startMs) / (7*24*60*60*1000));
         if(diffWeeks >= 0) week = Math.min(13, diffWeeks + 1);
       }
+
+      // Recalculate devot_pts from scratch — sum ALL approved daily responses for this week
+      // (including the one just approved) plus any approved weekly devot submission
+      var allApprovedDaily = await sb.from('daily_responses')
+        .select('devotional_id')
+        .eq('participant_id', resp.participant_id)
+        .eq('status', 'approved');
+      var approvedIds = (allApprovedDaily.data||[]).map(function(r){ return r.devotional_id; });
+      // Add the current one being approved
+      if(!approvedIds.includes(resp.devotional_id)) approvedIds.push(resp.devotional_id);
+
+      // Get pts for each approved devotional in this week
+      var devotPts = 0;
+      for(var j=0; j<approvedIds.length; j++){
+        var dd = DAILY_DEVOTIONALS.find(function(x){ return x.id===approvedIds[j]; });
+        if(!dd) continue;
+        // Check it belongs to this week
+        var ddWeek = SETTINGS.current_week;
+        if(SETTINGS.challenge_start_date && dd.date){
+          var ddMs = new Date(dd.date+'T00:00:00').getTime();
+          var ddDiff = Math.floor((ddMs - startMs) / (7*24*60*60*1000));
+          if(ddDiff >= 0) ddWeek = Math.min(13, ddDiff + 1);
+        }
+        if(ddWeek === week) devotPts += dd.pts;
+      }
+
+      // Add approved weekly devot pts for this week
+      var weeklyApproved = WEEKLY_DEVOT_SUBS.find(function(w){
+        return w.participant_id===resp.participant_id && w.week===week && w.status==='approved';
+      });
+      if(weeklyApproved) devotPts += (weeklyApproved.pts_awarded||2);
+
       var existing = LOGS.find(function(l){ return l.participant_id===resp.participant_id&&l.week===week; });
       if(existing){
-        var newDevotPts = existing.devot_pts + devot.pts;
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + newDevotPts + existing.challenge_pts).toFixed(2));
-        await sb.from('logs').update({devot_pts:newDevotPts, total_pts:newTotal}).eq('id',existing.id);
+        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
+        await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
         await sb.from('logs').insert({
           participant_id:resp.participant_id, week:week,
           weight:wt, pct_lost:0,
-          devot_pts:devot.pts, challenge_pts:0,
-          total_pts:devot.pts
+          devot_pts:devotPts, challenge_pts:0,
+          total_pts:devotPts
         });
       }
     }
