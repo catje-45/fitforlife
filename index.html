@@ -507,8 +507,8 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <div id="ml-ch-auto-label" style="font-size:11px;color:var(--g)"></div>
     </div>
     <div id="ml-ch-breakdown" style="font-size:16px;color:var(--tx3);margin-bottom:6px"></div>
-    <input class="inp" id="ml-ch" type="number" min="0" placeholder="0" style="width:100%">
-    <div style="font-size:15px;color:var(--tx3);margin-top:4px">Auto-filled from approved submissions. Override if needed.</div>
+    <input class="inp" id="ml-ch" type="number" min="0" placeholder="0" style="width:100%;opacity:.6" readonly>
+    <div style="font-size:15px;color:var(--tx3);margin-top:4px">Auto-filled from approved submissions. Managed automatically.</div>
   </div>
   <button class="btn btn-g" onclick="saveLog()">Save weight entry</button>
   <div class="err" id="ml-err"></div>
@@ -688,7 +688,7 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <div id="wds-placeholder">
         <div style="font-size:24px;margin-bottom:5px">📸</div>
         <div style="font-size:18px;font-weight:500;color:var(--tx2)">Tap to attach screenshot</div>
-        <div style="font-size:15px;color:var(--tx3);margin-top:3px">JPG, PNG, WebP · max 5MB</div>
+        <div style="font-size:15px;color:var(--tx3);margin-top:3px">JPG, PNG, WebP · max 20MB</div>
       </div>
       <input type="file" id="wds-file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleWdsFile(this)">
     </div>
@@ -2921,9 +2921,9 @@ async function saveLog(){
   if(m.track_weight === false){ err.textContent='This participant is in Devotion & Challenges only — weight tracking is disabled for them'; return; }
   if(!m.start_weight){ err.textContent='Participant has no start weight set'; return; }
   var pctLost = parseFloat(((m.start_weight-wt)/m.start_weight*100).toFixed(2));
-  var challengePts = parseInt(document.getElementById('ml-ch').value)||0;
   var existing = LOGS.find(function(l){ return l.participant_id===pid&&l.week===week; });
   var devotPts = existing ? existing.devot_pts : 0;
+  var challengePts = existing ? existing.challenge_pts : 0;
   var totalPts = parseFloat((Math.max(pctLost,0)+devotPts+challengePts).toFixed(2));
   var res = await sb.from('logs').upsert({participant_id:pid, week:week, weight:wt, pct_lost:pctLost, devot_pts:devotPts, challenge_pts:challengePts, total_pts:totalPts},{onConflict:'participant_id,week'});
   if(res.error){ err.textContent=res.error.message; return; }
@@ -3277,7 +3277,7 @@ function handleWdsFile(input){
   var err = document.getElementById('wds-err');
   err.textContent='';
   if(!file.type.startsWith('image/')){ err.textContent='Please upload an image'; return; }
-  if(file.size>5*1024*1024){ err.textContent='Image must be under 5MB'; return; }
+  if(file.size>20*1024*1024){ err.textContent='Image must be under 20MB'; return; }
   wdsFile=file;
   document.getElementById('wds-file-info').textContent = file.name+' · '+(file.size/1024/1024).toFixed(1)+'MB';
   var img = document.createElement('img');
