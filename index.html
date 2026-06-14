@@ -1066,6 +1066,25 @@ async function loadData(){
   CHALLENGES = results[4]; PENDING = results[5]; REFLECTIONS = results[6];
   SUBMISSIONS = results[7]; DAILY_DEVOTIONALS = results[8];
   DAILY_RESPONSES = results[9]; WEEKLY_DEVOT_SUBS = results[10];
+  await autoAdvanceWeek();
+}
+
+// ── AUTO-ADVANCE CURRENT WEEK ──────────────────────────────────────────────────
+// Automatically moves SETTINGS.current_week forward based on challenge_start_date,
+// so admins don't need to manually advance it each Monday.
+async function autoAdvanceWeek(){
+  var startStr = SETTINGS.challenge_start_date;
+  if(!startStr) return;
+  var start = new Date(startStr+'T00:00:00');
+  var now = new Date();
+  if(now < start) return; // challenge hasn't started yet
+  var msPerWeek = 7*24*60*60*1000;
+  var diffWeeks = Math.floor((now - start) / msPerWeek);
+  var calcWeek = Math.min(13, diffWeeks + 1);
+  if(calcWeek > SETTINGS.current_week){
+    SETTINGS.current_week = calcWeek;
+    await sb.from('settings').update({current_week:calcWeek}).eq('id',1);
+  }
 }
 
 // ── LAUNCH ADMIN ──────────────────────────────────────────────────────────────
