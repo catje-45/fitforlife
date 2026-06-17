@@ -2409,6 +2409,16 @@ function renderPartStats(){
 }
 
 // ── PARTICIPANT: DEVOTIONALS ──────────────────────────────────────────────────
+// ── PARTICIPANT: DEVOTIONALS ──────────────────────────────────────────────────
+var partDevotTab = 'daily';
+function switchPartDevotTab(tab){
+  partDevotTab = tab;
+  document.getElementById('pdt-daily-btn').classList.toggle('on', tab==='daily');
+  document.getElementById('pdt-weekly-btn').classList.toggle('on', tab==='weekly');
+  document.getElementById('pdt-daily-section').style.display = tab==='daily'?'block':'none';
+  document.getElementById('pdt-weekly-section').style.display = tab==='weekly'?'block':'none';
+}
+
 function renderPartDevot(){
   if(!challengeStarted()){
     var startStr = SETTINGS.challenge_start_date
@@ -2424,16 +2434,23 @@ function renderPartDevot(){
   var html = '<div style="padding-bottom:1rem">';
   if(roMode) html += readOnlyBanner();
 
-  // Daily
-  html += '<div class="c"><div class="c-title">&#128214; Daily devotional — '+formatDate(today)+'</div>';
+  // Sub-tab switcher
+  html += '<div style="display:flex;gap:6px;margin-bottom:.875rem;background:var(--bg3);border-radius:var(--r);padding:4px">'
+    +'<button class="auth-tab on" id="pdt-daily-btn" onclick="switchPartDevotTab(\'daily\')" style="flex:1;height:38px;font-size:14px">&#128214; Daily</button>'
+    +'<button class="auth-tab" id="pdt-weekly-btn" onclick="switchPartDevotTab(\'weekly\')" style="flex:1;height:38px;font-size:14px">&#128218; Weekly</button>'
+    +'</div>';
+
+  // DAILY SECTION
+  html += '<div id="pdt-daily-section">';
+  html += '<div class="c"><div class="c-title">&#128214; Daily devotional \u2014 '+formatDate(today)+'</div>';
   if(!todayDevot){
     html += '<div class="empty" style="padding:1rem 0"><span class="empty-icon">&#9728;</span>No devotional posted yet.<br>Check back later!</div>';
   } else if(myResponse){
     var sc = myResponse.status==='approved'?'tg':myResponse.status==='rejected'?'tred':'tgray';
-    var sl = myResponse.status==='approved'?'&#10003; Approved & points awarded':myResponse.status==='rejected'?'&#10007; Rejected — please resubmit':'&#9203; Submitted, pending review';
+    var sl = myResponse.status==='approved'?'&#10003; Approved & points awarded':myResponse.status==='rejected'?'&#10007; Rejected \u2014 please resubmit':'&#9203; Submitted, pending review';
     html += '<div style="font-size:20px;font-weight:500;margin-bottom:6px">'+todayDevot.title+'</div>'
       +'<span class="tag '+sc+'" style="margin-bottom:.75rem;display:inline-block">'+sl+'</span>'
-      +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+myResponse.reflection+'"</div>';
+      +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">\u201c'+myResponse.reflection+'\u201d</div>';
     if(myResponse.status==='rejected') html += !roMode?'<button class="btn btn-g" style="margin-top:.75rem;height:42px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">Resubmit reflection</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
   } else {
     html += '<div style="font-size:20px;font-weight:500;color:var(--tx);margin-bottom:6px">'+todayDevot.title+'</div>'
@@ -2445,21 +2462,44 @@ function renderPartDevot(){
         :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write reflection</button>');
   }
   html += '</div>';
+  // All past daily responses
+  var myPast = DAILY_RESPONSES.filter(function(r){ return r.participant_id===PROFILE.id&&(!todayDevot||r.devotional_id!==todayDevot.id); });
+  if(myPast.length){
+    html += '<div class="c"><div class="c-title">My past reflections <span style="font-size:14px;font-weight:400;color:var(--tx3)">'+myPast.length+' total</span></div>';
+    myPast.forEach(function(r){
+      var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?',pts:1};
+      var sc2 = r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray';
+      html += '<div style="padding:.75rem 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openMyReflectionView(\''+r.id+'\')">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<span class="tag '+sc2+'" style="font-size:13px">'+(r.status==='approved'?'&#10003; +'+d.pts+'pt':r.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
+        +'<span style="font-size:14px;color:var(--tx3)">'+formatDate(d.date)+'</span>'
+        +'</div>'
+        +'<span style="font-size:13px;color:var(--g)">View \u203a</span>'
+        +'</div>'
+        +'<div style="font-size:17px;font-weight:500;color:var(--tx2);margin-bottom:2px">'+d.title+'</div>'
+        +'<div style="font-size:15px;color:var(--tx3);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u201c'+r.reflection.slice(0,80)+(r.reflection.length>80?'...\u201d':'\u201d')+'</div>'
+        +'</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>'; // end pdt-daily-section
 
-  // Weekly
-  html += '<div class="c"><div class="c-title">&#128218; Weekly devotional — Week '+SETTINGS.current_week+'</div>';
+  // WEEKLY SECTION
+  html += '<div id="pdt-weekly-section" style="display:none">';
   var weekExpired = isWeekExpired(SETTINGS.current_week);
   var deadlineStr = getWeekDeadline(SETTINGS.current_week);
+  html += '<div class="c"><div class="c-title">&#128218; Week '+SETTINGS.current_week+' \u2014 Weekly devotional</div>';
   if(myWdsSub){
     var wsc = myWdsSub.status==='approved'?'tg':myWdsSub.status==='rejected'?'tred':'tgray';
-    var wsl = myWdsSub.status==='approved'?'&#10003; Approved · +'+( myWdsSub.pts_awarded||1)+' pt'+(( myWdsSub.pts_awarded||1)>1?'s':''):myWdsSub.status==='rejected'?'&#10007; Rejected — please resubmit':'&#9203; Submitted · pending review';
+    var wsl = myWdsSub.status==='approved'?'&#10003; Approved \u00b7 +'+(myWdsSub.pts_awarded||1)+' pt'+((myWdsSub.pts_awarded||1)>1?'s':''):myWdsSub.status==='rejected'?'&#10007; Rejected \u2014 please resubmit':'&#9203; Submitted \u00b7 pending review';
     var submittedAt = myWdsSub.created_at ? new Date(myWdsSub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
     html += '<span class="tag '+wsc+'" style="margin-bottom:.5rem;display:inline-block">'+wsl+'</span>'
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">Submitted: '+submittedAt+'</div>'
-      +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">"'+myWdsSub.reflection+'"</div>';
+      +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">\u201c'+myWdsSub.reflection+'\u201d</div>';
     if(myWdsSub.screenshot_url) html += '<img src="'+myWdsSub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:180px;object-fit:cover;margin-bottom:.75rem">';
-    if(myWdsSub.status==='rejected' && !weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
-    if(myWdsSub.status==='rejected' && weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed — resubmission closed</div>';
+    if(myWdsSub.status==='rejected'&&!weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
+    if(myWdsSub.status==='rejected'&&weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed \u2014 resubmission closed</div>';
   } else if(weekExpired){
     html += '<div style="text-align:center;padding:1rem 0">'
       +'<div style="font-size:28px;margin-bottom:.5rem">&#128274;</div>'
@@ -2477,28 +2517,29 @@ function renderPartDevot(){
         :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal()">&#128218; Submit reflection + screenshot</button>');
   }
   html += '</div>';
-
-  // Past daily responses
-  var myPast = DAILY_RESPONSES.filter(function(r){ return r.participant_id===PROFILE.id&&(!todayDevot||r.devotional_id!==todayDevot.id); }).slice(0,7);
-  if(myPast.length){
-    html += '<div class="c"><div class="c-title">My past reflections</div>';
-    myPast.forEach(function(r){
-      var d = DAILY_DEVOTIONALS.find(function(x){ return x.id===r.devotional_id; })||{title:'?',date:'?',pts:1};
-      var sc = r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray';
-      html += '<div style="padding:.75rem 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openMyReflectionView(\''+r.id+'\')">'
+  // Past weekly submissions
+  var myPastWeekly = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.participant_id===PROFILE.id&&s.week!==SETTINGS.current_week; })
+    .sort(function(a,b){ return b.week-a.week; });
+  if(myPastWeekly.length){
+    html += '<div class="c"><div class="c-title">Past weekly submissions <span style="font-size:14px;font-weight:400;color:var(--tx3)">'+myPastWeekly.length+' total</span></div>';
+    myPastWeekly.forEach(function(s){
+      var sc3 = s.status==='approved'?'tg':s.status==='rejected'?'tred':'tgray';
+      var sl3 = s.status==='approved'?'&#10003; Approved \u00b7 +'+(s.pts_awarded||1)+'pt':s.status==='rejected'?'&#10007; Rejected':'&#9203; Pending';
+      var subDate = s.created_at ? new Date(s.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short'}) : '';
+      html += '<div style="padding:.75rem 0;border-bottom:1px solid var(--bdr)">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-        +'<div style="display:flex;align-items:center;gap:6px">'
-        +'<span class="tag '+sc+'" style="font-size:13px">'+(r.status==='approved'?'&#10003; +'+d.pts+'pt':r.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
-        +'<span style="font-size:14px;color:var(--tx3)">'+formatDate(d.date)+'</span>'
+        +'<div style="font-family:var(--head);font-size:15px;font-weight:700;color:var(--tx)">Week '+s.week+'</div>'
+        +'<span class="tag '+sc3+'" style="font-size:13px">'+sl3+'</span>'
         +'</div>'
-        +'<span style="font-size:13px;color:var(--g)">View ›</span>'
-        +'</div>'
-        +'<div style="font-size:17px;font-weight:500;color:var(--tx2);margin-bottom:2px">'+d.title+'</div>'
-        +'<div style="font-size:15px;color:var(--tx3);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,80)+(r.reflection.length>80?'...':'')+'"</div>'
+        +'<div style="font-size:14px;color:var(--tx3);margin-bottom:4px">Submitted: '+subDate+'</div>'
+        +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u201c'+s.reflection.slice(0,80)+(s.reflection.length>80?'...\u201d':'\u201d')+'</div>'
+        +(s.screenshot_url?'<img src="'+s.screenshot_url+'" style="margin-top:6px;width:100%;max-height:120px;object-fit:cover;border-radius:var(--rs)">':'')
         +'</div>';
     });
     html += '</div>';
   }
+  html += '</div>'; // end pdt-weekly-section
+  html += '<script>setTimeout(function(){ switchPartDevotTab(partDevotTab); },0);<\/script>';
   return html + '</div>';
 }
 
@@ -2552,42 +2593,55 @@ function renderPartChallenges(){
       : 'a date set by your admin';
     return '<div style="padding-bottom:1rem">'+notStartedCard('Challenges open on the challenge start date.', startStr)+'</div>';
   }
-  var cur = CHALLENGES.filter(function(ch){ return ch.week===SETTINGS.current_week; });
   var roMode = isReadOnly();
   var html = '<div style="padding-bottom:1rem">';
   if(roMode) html += readOnlyBanner();
-  html += '<div class="c"><div class="c-title">Week '+SETTINGS.current_week+' challenges</div>';
-  if(!cur.length) html += '<div class="empty" style="padding:1rem 0"><span class="empty-icon">&#127885;</span>No challenges set yet</div>';
-  cur.forEach(function(ch){
-    var d = ch.pts===1?{l:'Easy',cls:'tg'}:ch.pts===2?{l:'Medium',cls:'tblue'}:{l:'Hard',cls:'tgold'};
-    var mySub = SUBMISSIONS.find(function(s){ return s.challenge_id===ch.id&&s.participant_id===PROFILE.id; });
-    html += '<div class="chi" style="flex-direction:column;align-items:flex-start;gap:8px">'
-      +'<div style="display:flex;align-items:center;gap:8px;width:100%">'
-      +'<div class="chi-text">'+ch.description+'</div>'
-      +'<span class="tag '+d.cls+'">'+d.l+'</span>'
-      +'<span class="tag tgray">+'+ch.pts+'pt'+(ch.pts>1?'s':'')+'</span>'
-      +'</div>';
-    if(mySub){
-      var sc2 = mySub.status==='approved'?'tg':mySub.status==='rejected'?'tred':'tgray';
-      html += '<div style="display:flex;align-items:center;gap:8px;width:100%">'
-        +'<span class="tag '+sc2+'" style="font-size:11px">&#10003; Submitted'+(mySub.status==='approved'?' · Approved':mySub.status==='rejected'?' · Rejected':'')+'</span>'
-        +(!roMode?'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>':'')
+
+  // Show current week + up to 3 previous weeks (4 weeks total) as open for submission
+  var minOpenWeek = Math.max(1, SETTINGS.current_week - 3);
+  var openWeeks = [];
+  for(var w = SETTINGS.current_week; w >= minOpenWeek; w--) openWeeks.push(w);
+
+  openWeeks.forEach(function(wk){
+    var wkChallenges = CHALLENGES.filter(function(ch){ return ch.week===wk; });
+    var isCurrent = wk === SETTINGS.current_week;
+    html += '<div class="c"><div class="c-title">'+(isCurrent?'Week '+wk+' challenges \u2014 Current':'Week '+wk+' challenges <span style="font-size:14px;font-weight:400;color:var(--tx3)">\u00b7 still open</span>')+'</div>';
+    if(!wkChallenges.length){
+      html += '<div class="empty" style="padding:1rem 0"><span class="empty-icon">&#127885;</span>No challenges set yet</div>';
+    }
+    wkChallenges.forEach(function(ch){
+      var d = ch.pts===1?{l:'Easy',cls:'tg'}:ch.pts===2?{l:'Medium',cls:'tblue'}:{l:'Hard',cls:'tgold'};
+      var mySub = SUBMISSIONS.find(function(s){ return s.challenge_id===ch.id&&s.participant_id===PROFILE.id; });
+      html += '<div class="chi" style="flex-direction:column;align-items:flex-start;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:8px;width:100%">'
+        +'<div class="chi-text">'+ch.description+'</div>'
+        +'<span class="tag '+d.cls+'">'+d.l+'</span>'
+        +'<span class="tag tgray">+'+ch.pts+'pt'+(ch.pts>1?'s':'')+'</span>'
         +'</div>';
-    } else {
-      html += !roMode
-        ?'<button class="btn-sm btn-sm-g" style="width:100%;height:36px;font-size:12px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">&#128247; Submit proof</button>'
-        :'<div style="font-size:13px;color:var(--warn);padding:.4rem 0">&#128274; Submissions disabled in read-only mode</div>';
+      if(mySub){
+        var sc2 = mySub.status==='approved'?'tg':mySub.status==='rejected'?'tred':'tgray';
+        html += '<div style="display:flex;align-items:center;gap:8px;width:100%">'
+          +'<span class="tag '+sc2+'" style="font-size:11px">&#10003; Submitted'+(mySub.status==='approved'?' \u00b7 Approved':mySub.status==='rejected'?' \u00b7 Rejected':'')+'</span>'
+          +(!roMode?'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>':'')
+          +'</div>';
+      } else {
+        html += !roMode
+          ?'<button class="btn-sm btn-sm-g" style="width:100%;height:36px;font-size:12px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">&#128247; Submit proof</button>'
+          :'<div style="font-size:13px;color:var(--warn);padding:.4rem 0">&#128274; Submissions disabled in read-only mode</div>';
+      }
+      html += '</div>';
+    });
+    if(wkChallenges.length){
+      var maxPtsCh = wkChallenges.reduce(function(s,ch){ return s+ch.pts; },0);
+      html += '<div style="margin-top:.75rem;padding:.7rem;background:var(--bg3);border-radius:var(--rs);font-size:16px;color:var(--tx2)">Complete all to earn up to <strong style="color:var(--g)">+'+maxPtsCh+' pts</strong>.</div>';
     }
     html += '</div>';
   });
-  if(cur.length){
-    var maxPtsCh = cur.reduce(function(s,ch){ return s+ch.pts; },0);
-    html += '<div style="margin-top:.75rem;padding:.7rem;background:var(--bg3);border-radius:var(--rs);font-size:16px;color:var(--tx2)">Complete all challenges to earn up to <strong style="color:var(--g)">+'+maxPtsCh+' pts</strong> this week.</div>';
-  }
-  html += '</div>';
-  var mySubs = SUBMISSIONS.filter(function(s){ return s.participant_id===PROFILE.id; }).slice(0,10);
+
+  // My submissions history
+  var mySubs = SUBMISSIONS.filter(function(s){ return s.participant_id===PROFILE.id; });
   if(mySubs.length){
-    html += '<div class="c"><div class="c-title">My submissions</div>';
+    html += '<div class="c"><div class="c-title">My submissions <span style="font-size:14px;font-weight:400;color:var(--tx3)">'+mySubs.length+' total</span></div>';
     mySubs.forEach(function(sub){
       var ch = CHALLENGES.find(function(c){ return c.id===sub.challenge_id; })||{description:'Challenge',week:'?'};
       var sc3 = sub.status==='approved'?'tg':sub.status==='rejected'?'tred':'tgray';
@@ -2603,12 +2657,14 @@ function renderPartChallenges(){
     });
     html += '</div>';
   }
-  var past = CHALLENGES.filter(function(ch){ return ch.week<SETTINGS.current_week; });
-  if(past.length){
+
+  // Older past challenges (before the 4-week open window) — read-only display
+  var closedPast = CHALLENGES.filter(function(ch){ return ch.week < minOpenWeek; });
+  if(closedPast.length){
     var byw2 = {};
-    past.forEach(function(ch){ if(!byw2[ch.week]) byw2[ch.week]=[]; byw2[ch.week].push(ch); });
-    html += '<div class="c"><div class="c-title">Past challenges</div>';
-    Object.keys(byw2).sort(function(a,b){ return b-a; }).slice(0,4).forEach(function(w){
+    closedPast.forEach(function(ch){ if(!byw2[ch.week]) byw2[ch.week]=[]; byw2[ch.week].push(ch); });
+    html += '<div class="c"><div class="c-title">Past challenges <span style="font-size:14px;font-weight:400;color:var(--tx3)">\u00b7 closed</span></div>';
+    Object.keys(byw2).sort(function(a,b){ return b-a; }).forEach(function(w){
       html += '<div style="margin-bottom:.5rem"><div style="font-size:15px;color:var(--tx3);margin-bottom:3px">Week '+w+'</div>';
       byw2[w].forEach(function(ch){
         html += '<div style="font-size:18px;color:var(--tx2);padding:3px 0;border-bottom:1px solid var(--bdr)">'+ch.description+' <span class="tag tgray">+'+ch.pts+'</span></div>';
@@ -2619,6 +2675,7 @@ function renderPartChallenges(){
   }
   return html + '</div>';
 }
+
 
 // ── LB HELPERS ────────────────────────────────────────────────────────────────
 function lbItem(x, i, maxPts, maskNames){
