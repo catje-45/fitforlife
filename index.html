@@ -2497,7 +2497,7 @@ function renderPartDevot(){
     html += '<span class="tag '+wsc+'" style="margin-bottom:.5rem;display:inline-block">'+wsl+'</span>'
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">Submitted: '+submittedAt+'</div>'
       +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">\u201c'+myWdsSub.reflection+'\u201d</div>';
-    if(myWdsSub.screenshot_url) html += '<img src="'+myWdsSub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:180px;object-fit:cover;margin-bottom:.75rem">';
+    if(myWdsSub.screenshot_url) html += '<img src="'+myWdsSub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:400px;object-fit:contain;background:var(--bg3);margin-bottom:.75rem;cursor:pointer" onclick="window.open(\''+myWdsSub.screenshot_url+'\',\'_blank\')">';
     if(myWdsSub.status==='rejected'&&!weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
     if(myWdsSub.status==='rejected'&&weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed \u2014 resubmission closed</div>';
   } else if(weekExpired){
@@ -2533,7 +2533,7 @@ function renderPartDevot(){
         +'</div>'
         +'<div style="font-size:14px;color:var(--tx3);margin-bottom:4px">Submitted: '+subDate+'</div>'
         +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u201c'+s.reflection.slice(0,80)+(s.reflection.length>80?'...\u201d':'\u201d')+'</div>'
-        +(s.screenshot_url?'<img src="'+s.screenshot_url+'" style="margin-top:6px;width:100%;max-height:120px;object-fit:cover;border-radius:var(--rs)">':'')
+        +(s.screenshot_url?'<img src="'+s.screenshot_url+'" style="margin-top:6px;width:100%;max-height:300px;object-fit:contain;background:var(--bg3);border-radius:var(--rs);cursor:pointer" onclick="window.open(\''+s.screenshot_url+'\',\'_blank\')">':'')
         +'</div>';
     });
     html += '</div>';
@@ -2622,6 +2622,7 @@ function renderPartChallenges(){
         var sc2 = mySub.status==='approved'?'tg':mySub.status==='rejected'?'tred':'tgray';
         html += '<div style="display:flex;align-items:center;gap:8px;width:100%">'
           +'<span class="tag '+sc2+'" style="font-size:11px">&#10003; Submitted'+(mySub.status==='approved'?' \u00b7 Approved':mySub.status==='rejected'?' \u00b7 Rejected':'')+'</span>'
+          +'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="viewSubmission(\''+mySub.id+'\')">'+(mySub.file_type&&mySub.file_type.startsWith(\'video\')?'&#127909;':'&#128247;')+' View</button>'
           +(!roMode?'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>':'')
           +'</div>';
       } else {
