@@ -3210,8 +3210,8 @@ function viewSubmission(subId){
   var body = document.getElementById('m-view-sub-body');
   body.innerHTML = '<div style="margin-bottom:.75rem"><div style="font-size:18px;font-weight:500;margin-bottom:3px">'+ch.description+'</div>'
     +'<div style="font-size:15px;color:var(--tx3)">Week '+ch.week+' · '+participant.full_name+'</div></div>'
-    +(isVideo?'<video src="'+sub.file_url+'" controls style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:280px;background:#000"></video>'
-    :'<img src="'+sub.file_url+'" style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:280px;object-fit:cover">')
+    +(isVideo?'<video src="'+sub.file_url+'" controls style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:400px;background:#000"></video>'
+    :'<img src="'+sub.file_url+'" style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:400px;object-fit:contain;background:var(--bg3);cursor:pointer" onclick="window.open(\''+sub.file_url+'\',\'_blank\')">')
     +(sub.caption?'<div style="font-size:18px;color:var(--tx2);font-style:italic;margin-bottom:.75rem">"'+sub.caption+'"</div>':'')
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">'
     +'<span class="tag '+sc+'">'+(sub.status==='approved'?'&#10003; Approved':sub.status==='rejected'?'&#10007; Rejected':'&#9203; Pending review')+'</span>'
