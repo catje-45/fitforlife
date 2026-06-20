@@ -2622,7 +2622,7 @@ function renderPartChallenges(){
         var sc2 = mySub.status==='approved'?'tg':mySub.status==='rejected'?'tred':'tgray';
         html += '<div style="display:flex;align-items:center;gap:8px;width:100%">'
           +'<span class="tag '+sc2+'" style="font-size:11px">&#10003; Submitted'+(mySub.status==='approved'?' \u00b7 Approved':mySub.status==='rejected'?' \u00b7 Rejected':'')+'</span>'
-          +'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="viewSubmission(\''+mySub.id+'\')">'+(mySub.file_type&&mySub.file_type.startsWith(\'video\')?'&#127909;':'&#128247;')+' View</button>'
+          +'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="viewSubmission(\''+mySub.id+'\')">'+(mySub.file_type&&mySub.file_type.startsWith('video')?'&#127909;':'&#128247;')+' View</button>'
           +(!roMode?'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">Replace</button>':'')
           +'</div>';
       } else {
