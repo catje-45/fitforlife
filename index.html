@@ -853,6 +853,13 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
         <div style="font-size:13px;color:var(--tx3);margin-top:2px">Everyone can log in and view, but cannot submit devotionals, challenges or reflections.</div>
       </div>
     </label>
+    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-latesub-label">
+      <input type="checkbox" id="ms-latesub" onchange="document.getElementById('ms-latesub-label').style.borderColor=this.checked?'var(--g)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--g)">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--tx)">⏰ Allow late submissions</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Overrides all deadlines — participants can submit daily devotionals, weekly devotionals, and task challenges past their due dates.</div>
+      </div>
+    </label>
   </div>
   <div class="field"><div class="flabel">Current week (1–13)</div><input class="inp" id="ms-wk" type="number" min="1" max="13"></div>
   <div class="field"><div class="flabel">Entry fee ($)</div><input class="inp" id="ms-fee" type="number" step="0.01" min="1"></div>
@@ -3045,6 +3052,9 @@ function openSettingsModal(){
   var ro = !!SETTINGS.read_only_mode;
   document.getElementById('ms-readonly').checked = ro;
   document.getElementById('ms-readonly-label').style.borderColor = ro?'var(--warn)':'var(--bdr)';
+  var late = !!SETTINGS.allow_late_submissions;
+  document.getElementById('ms-latesub').checked = late;
+  document.getElementById('ms-latesub-label').style.borderColor = late?'var(--g)':'var(--bdr)';
   openModal('m-settings');
 }
 async function saveSettings(){
@@ -3053,10 +3063,12 @@ async function saveSettings(){
   var startDate = document.getElementById('ms-startdate').value||null;
   var maintenance = document.getElementById('ms-maintenance').checked;
   var readOnly = document.getElementById('ms-readonly').checked;
+  var lateSubmissions = document.getElementById('ms-latesub').checked;
   if(wk<1||wk>13||isNaN(fee)||fee<=0) return;
-  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, read_only_mode:readOnly, updated_at:new Date().toISOString()}).eq('id',1);
+  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, read_only_mode:readOnly, allow_late_submissions:lateSubmissions, updated_at:new Date().toISOString()}).eq('id',1);
+  SETTINGS.allow_late_submissions = lateSubmissions;
   closeModal('m-settings');
-  toast(maintenance?'🔧 Maintenance mode ON':readOnly?'👁 Read-only mode ON':'Settings saved!');
+  toast(maintenance?'🔧 Maintenance mode ON':readOnly?'👁 Read-only mode ON':lateSubmissions?'⏰ Late submissions allowed':'Settings saved!');
   await refreshCurrentTab();
 }
 
@@ -3309,8 +3321,9 @@ function getWeekDeadline(weekNum){
 }
 
 function isWeekExpired(weekNum){
+  if(SETTINGS && SETTINGS.allow_late_submissions) return false;
   var end = getWeekEndDate(weekNum);
-  if(!end) return false; // no date set = open
+  if(!end) return false;
   return new Date() > end;
 }
 
@@ -3991,7 +4004,7 @@ async function saveDailyReflection(){
   if(!deadline && devot) {
     deadline = new Date(devot.date+'T23:59:59');
   }
-  if(deadline && new Date() > deadline){
+  if(deadline && new Date() > deadline && !(SETTINGS && SETTINGS.allow_late_submissions)){
     err.textContent='The submission deadline has passed for this devotional'; return;
   }
   var btn = document.getElementById('dr-submit-btn');
