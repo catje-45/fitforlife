@@ -3908,8 +3908,10 @@ async function saveDailyDevot(){
   if(!date){ err.textContent='Select a date'; return; }
   if(!title){ err.textContent='Enter a title'; return; }
   if(!content){ err.textContent='Enter the content'; return; }
+  var existing = DAILY_DEVOTIONALS.find(function(x){ return x.date===date; });
+  if(existing){ err.textContent='A devotional already exists for this date ("'+existing.title+'"). Use the Edit button to update it.'; return; }
   var deadlineDt = date+'T'+deadlineTime+':00';
-  var res = await sb.from('daily_devotionals').upsert({date:date, title:title, content:content, pts:pts, deadline:deadlineDt},{onConflict:'date'});
+  var res = await sb.from('daily_devotionals').insert({date:date, title:title, content:content, pts:pts, deadline:deadlineDt});
   if(res.error){ err.textContent=res.error.message; return; }
   closeModal('m-daily-post'); toast('Daily devotional posted!');
   await refreshCurrentTab();
