@@ -2552,7 +2552,7 @@ function renderPartDevot(){
   // Missed devotionals — only show when late submissions are allowed
   if(SETTINGS && SETTINGS.allow_late_submissions){
     var myResponseIds = DAILY_RESPONSES.filter(function(r){ return r.participant_id===PROFILE.id; }).map(function(r){ return r.devotional_id; });
-    var missed = DAILY_DEVOTIONALS.filter(function(d){ return d.date<today && !myResponseIds.includes(d.id); })
+    var missed = DAILY_DEVOTIONALS.filter(function(d){ return d.date<today && d.date>=(SETTINGS.challenge_start_date||'') && !myResponseIds.includes(d.id); })
       .sort(function(a,b){ return b.date.localeCompare(a.date); });
     if(missed.length){
       html += '<div class="c"><div class="c-title">&#9203; Missed devotionals <span style="font-size:14px;font-weight:400;color:var(--warn)">'+missed.length+' open for late submission</span></div>';
