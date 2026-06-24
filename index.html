@@ -3401,7 +3401,9 @@ async function reviewSubmission(subId, status){
         var cc = CHALLENGES.find(function(x){ return x.id===approvedChIds[k]; });
         if(cc && cc.week===week) chPts += cc.pts;
       }
-      var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===week; });
+      // Re-query log row fresh from DB
+      var logRes = await sb.from('logs').select('*').eq('participant_id',sub.participant_id).eq('week',week).maybeSingle();
+      var existing = logRes.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
         var newTotal = parseFloat((weightPts + existing.devot_pts + chPts).toFixed(2));
@@ -3644,7 +3646,9 @@ async function reviewWeeklyDevot(subId, status, pts){
         }
       }
       devotPts += 2; // weekly approved = always 2 pts
-      var existing = LOGS.find(function(l){ return l.participant_id===sub.participant_id&&l.week===sub.week; });
+      // Re-query log row fresh from DB
+      var logResW = await sb.from('logs').select('*').eq('participant_id',sub.participant_id).eq('week',sub.week).maybeSingle();
+      var existing = logResW.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
         var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
@@ -4083,7 +4087,9 @@ async function reviewDailyResponse(id, status){
       });
       if(weeklyApproved) devotPts += (weeklyApproved.pts_awarded||2);
 
-      var existing = LOGS.find(function(l){ return l.participant_id===resp.participant_id&&l.week===week; });
+      // Re-query log row fresh from DB
+      var logResD = await sb.from('logs').select('*').eq('participant_id',resp.participant_id).eq('week',week).maybeSingle();
+      var existing = logResD.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
         var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
