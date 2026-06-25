@@ -475,6 +475,7 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <option value="challenge_manager">Challenge Manager</option>
       <option value="devotion_leader">Devotion Leader</option>
       <option value="admin">Admin</option>
+      <option value="super_admin">Super Admin</option>
     </select>
   </div>
   <button class="btn btn-g" id="mas-save-btn" onclick="saveAssign()">Save changes</button>
@@ -1033,10 +1034,10 @@ async function loadSession(user){
     }
     await loadData();
     // Non-admins see maintenance screen if enabled
-    if(SETTINGS.maintenance_mode && !['admin','challenge_manager','devotion_leader'].includes(PROFILE.role)){
+    if(SETTINGS.maintenance_mode && !['admin','super_admin','challenge_manager','devotion_leader'].includes(PROFILE.role)){
       showScr('scr-maintenance'); sessionLoading=false; return;
     }
-    if(PROFILE.role === 'admin') launchAdmin();
+    if(PROFILE.role === 'admin' || PROFILE.role === 'super_admin') launchAdmin();
     else if(PROFILE.role === 'challenge_manager') launchChmgr();
     else if(PROFILE.role === 'devotion_leader') launchDevldr();
     else launchParticipant();
@@ -1061,7 +1062,7 @@ async function loadData(){
   var results = await Promise.all([
     safeQueryOne(sb.from('settings').select('*').eq('id',1).single()),
     safeQuery(sb.from('teams').select('*').order('created_at')),
-    safeQuery(sb.from('profiles').select('*').in('role',['participant','admin','challenge_manager','devotion_leader','pending']).order('full_name')),
+    safeQuery(sb.from('profiles').select('*').in('role',['participant','admin','super_admin','challenge_manager','devotion_leader','pending']).order('full_name')),
     safeQuery(sb.from('logs').select('*').order('week')),
     safeQuery(sb.from('challenges').select('*').order('week')),
     safeQuery(sb.from('profiles').select('*').eq('role','pending').order('created_at')),
@@ -1509,7 +1510,7 @@ async function archiveAndReset(){
     await sb.from('challenge_submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
     await sb.from('daily_responses').delete().neq('id','00000000-0000-0000-0000-000000000000');
     await sb.from('weekly_devot_submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
-    await sb.from('profiles').update({start_weight:null}).in('role',['participant','challenge_manager','devotion_leader','admin']);
+    await sb.from('profiles').update({start_weight:null}).in('role',['participant','challenge_manager','devotion_leader','admin','super_admin']);
     await sb.from('settings').update({current_week:1}).eq('id',1);
     closeModal('m-archive');
     toast('&#128230; Round archived & reset successfully!');
@@ -2926,7 +2927,7 @@ document.addEventListener('DOMContentLoaded', function(){
 // ── ROLE-AWARE TAB REFRESH ────────────────────────────────────────────────────
 async function refreshCurrentTab(){
   await loadData(); // always reload fresh data first
-  if(PROFILE.role === 'admin') await adminTab(adminCurrentTab);
+  if(PROFILE.role === 'admin' || PROFILE.role === 'super_admin') await adminTab(adminCurrentTab);
   else if(PROFILE.role === 'challenge_manager') await chmgrTab(chmgrCurrentTab);
   else if(PROFILE.role === 'devotion_leader') await devldrTab(devldrCurrentTab);
   else await partTab(partCurrentTab);
@@ -3365,7 +3366,8 @@ function viewSubmission(subId){
     +'<span class="tag '+sc+'">'+(sub.status==='approved'?'&#10003; Approved':sub.status==='rejected'?'&#10007; Rejected':'&#9203; Pending review')+'</span>'
     +'<span style="font-size:15px;color:var(--tx3)">'+new Date(sub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'})+'</span>'
     +'</div>'
-    +(PROFILE&&PROFILE.role==='admin'&&sub.status==='pending'?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +(PROFILE&&PROFILE.role==='super_admin'&&sub.reviewed_by?(function(){ var reviewer=MEMBERS.find(function(m){ return m.id===sub.reviewed_by; }); return '<div style="display:flex;align-items:center;gap:8px;padding:.5rem .75rem;background:var(--bg3);border-radius:var(--rs);margin-bottom:.75rem;font-size:14px;color:var(--tx3)">&#128100; Reviewed by: <strong style="color:var(--tx)">'+((reviewer&&reviewer.full_name)||'Unknown')+'</strong></div>'; })():'')
+    +((PROFILE&&(PROFILE.role==='admin'||PROFILE.role==='super_admin')&&sub.status==='pending')?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     +'<button class="btn btn-danger" style="height:42px;font-size:13px" onclick="reviewSubmission(\''+sub.id+'\',\'rejected\')">&#10007; Reject</button>'
     +'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="reviewSubmission(\''+sub.id+'\',\'approved\')">&#10003; Approve</button>'
     +'</div>':'');
@@ -3384,7 +3386,7 @@ async function reviewSubmission(subId, status){
     toast('&#9888; You cannot approve your own submission — ask an admin to review it');
     return;
   }
-  var res = await sb.from('challenge_submissions').update({status:status}).eq('id',subId);
+  var res = await sb.from('challenge_submissions').update({status:status, reviewed_by:PROFILE.id}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved' && sub){
     var ch = CHALLENGES.find(function(c){ return c.id===sub.challenge_id; });
@@ -3423,7 +3425,7 @@ async function reviewSubmission(subId, status){
 }
 
 function isReadOnly(){
-  return !!(SETTINGS && SETTINGS.read_only_mode) && PROFILE && !['admin','challenge_manager','devotion_leader'].includes(PROFILE.role);
+  return !!(SETTINGS && SETTINGS.read_only_mode) && PROFILE && !['admin','super_admin','challenge_manager','devotion_leader'].includes(PROFILE.role);
 }
 function readOnlyBanner(){
   return '<div style="background:var(--golddim);border:1px solid rgba(240,192,48,.3);border-radius:var(--rs);padding:.75rem 1rem;margin-bottom:.875rem;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--gold)">&#128274; Read-only mode — submissions are temporarily disabled. You can still view all content.</div>';
@@ -3625,7 +3627,7 @@ async function reviewWeeklyDevot(subId, status, pts){
     return;
   }
   var awardedPts = status==='approved' ? 2 : null; // always 2 pts
-  var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:awardedPts}).eq('id',subId);
+  var res = await sb.from('weekly_devot_submissions').update({status:status, pts_awarded:awardedPts, reviewed_by:PROFILE.id}).eq('id',subId);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved'){
     var mem = MEMBERS.find(function(x){ return x.id===sub.participant_id; });
@@ -4041,7 +4043,7 @@ async function reviewDailyResponse(id, status){
     toast('&#9888; You cannot approve your own reflection — ask an admin to review it');
     return;
   }
-  var res = await sb.from('daily_responses').update({status:status}).eq('id',id);
+  var res = await sb.from('daily_responses').update({status:status, reviewed_by:PROFILE.id}).eq('id',id);
   if(res.error){ toast('Error: '+res.error.message); return; }
   if(status==='approved'){
     var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===resp.devotional_id; });
