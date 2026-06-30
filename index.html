@@ -1051,15 +1051,23 @@ async function loadSession(user){
 
 // ── SAFE QUERY HELPERS ────────────────────────────────────────────────────────
 async function safeQuery(promise){
-  try { var r = await promise; return r.data||[]; } catch(e){ return []; }
+  try {
+    var r = await promise;
+    if(r.error){ console.error('Supabase query error:', r.error); }
+    return r.data||[];
+  } catch(e){ console.error('Supabase query exception:', e); return []; }
 }
 async function safeQueryOne(promise){
   try { var r = await promise; return r.data||null; } catch(e){ return null; }
 }
 
 // ── LOAD ALL DATA ─────────────────────────────────────────────────────────────
+var loadDataInFlight = null;
 async function loadData(){
-  var results = await Promise.all([
+  // If a load is already in progress, wait for it instead of starting a new overlapping one
+  if(loadDataInFlight){ return loadDataInFlight; }
+  loadDataInFlight = (async function(){
+    var results = await Promise.all([
     safeQueryOne(sb.from('settings').select('*').eq('id',1).single()),
     safeQuery(sb.from('teams').select('*').order('created_at')),
     safeQuery(sb.from('profiles').select('*').in('role',['participant','admin','super_admin','challenge_manager','devotion_leader','pending']).order('full_name')),
@@ -1078,6 +1086,12 @@ async function loadData(){
   SUBMISSIONS = results[7]; DAILY_DEVOTIONALS = results[8];
   DAILY_RESPONSES = results[9]; WEEKLY_DEVOT_SUBS = results[10];
   await autoAdvanceWeek();
+  })();
+  try {
+    await loadDataInFlight;
+  } finally {
+    loadDataInFlight = null;
+  }
 }
 
 // ── AUTO-ADVANCE CURRENT WEEK ──────────────────────────────────────────────────
@@ -3349,8 +3363,11 @@ async function saveSubmission(){
     fill.style.width='0%';
   }
 }
-function viewSubmission(subId){
+async function viewSubmission(subId){
   var sub = SUBMISSIONS.find(function(s){ return s.id===subId; });
+  // Re-query fresh from DB to get latest reviewed_by and status
+  var freshRes = await sb.from('challenge_submissions').select('*').eq('id',subId).maybeSingle();
+  if(freshRes.data) sub = freshRes.data;
   if(!sub) return;
   var ch = CHALLENGES.find(function(c){ return c.id===sub.challenge_id; })||{description:'Challenge',week:'?'};
   var participant = MEMBERS.find(function(m){ return m.id===sub.participant_id; })||{full_name:'?'};
