@@ -1057,6 +1057,24 @@ async function safeQuery(promise){
     return r.data||[];
   } catch(e){ console.error('Supabase query exception:', e); return []; }
 }
+// Paginates past Supabase's default 1000-row-per-request limit.
+// queryFn(from, to) must return a fresh query each call (range is mutated internally).
+async function safeQueryAll(queryFn){
+  var pageSize = 1000;
+  var all = [];
+  var from = 0;
+  while(true){
+    try {
+      var r = await queryFn(from, from+pageSize-1);
+      if(r.error){ console.error('Supabase paginated query error:', r.error); break; }
+      var batch = r.data||[];
+      all = all.concat(batch);
+      if(batch.length < pageSize) break; // last page
+      from += pageSize;
+    } catch(e){ console.error('Supabase paginated query exception:', e); break; }
+  }
+  return all;
+}
 async function safeQueryOne(promise){
   try { var r = await promise; return r.data||null; } catch(e){ return null; }
 }
@@ -1071,14 +1089,14 @@ async function loadData(){
     safeQueryOne(sb.from('settings').select('*').eq('id',1).single()),
     safeQuery(sb.from('teams').select('*').order('created_at')),
     safeQuery(sb.from('profiles').select('*').in('role',['participant','admin','super_admin','challenge_manager','devotion_leader','pending']).order('full_name')),
-    safeQuery(sb.from('logs').select('*').order('week')),
+    safeQueryAll(function(from,to){ return sb.from('logs').select('*').order('week').range(from,to); }),
     safeQuery(sb.from('challenges').select('*').order('week')),
     safeQuery(sb.from('profiles').select('*').eq('role','pending').order('created_at')),
     safeQuery(sb.from('reflections').select('*').order('week')),
-    safeQuery(sb.from('challenge_submissions').select('*').order('created_at',{ascending:false})),
+    safeQueryAll(function(from,to){ return sb.from('challenge_submissions').select('*').order('created_at',{ascending:false}).range(from,to); }),
     safeQuery(sb.from('daily_devotionals').select('*').order('date',{ascending:false})),
-    safeQuery(sb.from('daily_responses').select('*').order('created_at',{ascending:false})),
-    safeQuery(sb.from('weekly_devot_submissions').select('*').order('created_at',{ascending:false}))
+    safeQueryAll(function(from,to){ return sb.from('daily_responses').select('*').order('created_at',{ascending:false}).range(from,to); }),
+    safeQueryAll(function(from,to){ return sb.from('weekly_devot_submissions').select('*').order('created_at',{ascending:false}).range(from,to); })
   ]);
   if(results[0]) SETTINGS = results[0];
   TEAMS = results[1]; MEMBERS = results[2]; LOGS = results[3];
