@@ -3672,6 +3672,7 @@ function openWeeklyReview(subId){
     +(PROFILE&&PROFILE.role==='admin'?'<button class="btn btn-danger" style="height:40px;font-size:15px" onclick="deleteWeeklyDevot(\''+sub.id+'\')">&#128465; Delete</button>':'')
     +'</div>';
   openModal('m-weekly-review');
+  setTimeout(loadSignedScreenshots, 50); // load signed screenshot in the modal
 }
 var editingWeeklySubId = null;
 function openEditWeeklyDevot(subId){
@@ -3930,6 +3931,7 @@ function openWeeklyArchive(week){
   }
   body.innerHTML = html;
   openModal('m-weekly-archive');
+  setTimeout(loadSignedScreenshots, 50); // load signed screenshots in the modal
 }
 
 var devotMode = 'single';
