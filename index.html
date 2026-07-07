@@ -1079,7 +1079,45 @@ async function safeQueryOne(promise){
   try { var r = await promise; return r.data||null; } catch(e){ return null; }
 }
 
-// ── LOAD ALL DATA ─────────────────────────────────────────────────────────────
+// ── SIGNED URL HELPER ─────────────────────────────────────────────────────────
+// Generates a temporary signed URL (1 hour) for a private storage file.
+// Falls back gracefully if path is already a full URL (legacy data).
+async function getSignedUrl(path){
+  if(!path) return null;
+  if(path.startsWith('http')) {
+    // Legacy public URL — extract path from it
+    var match = path.match(/challenge-media\/(.+)$/);
+    if(match) path = match[1];
+    else return path; // can't parse, return as-is
+  }
+  var res = await sb.storage.from('challenge-media').createSignedUrl(path, 86400); // 24 hours
+  if(res.error){ console.error('Signed URL error:', res.error); return null; }
+  return res.data.signedUrl;
+}
+
+// Render an image or video with a signed URL, replacing a placeholder element
+async function renderSignedMedia(path, fileType, targetEl, extraStyle){
+  var url = await getSignedUrl(path);
+  if(!url){ targetEl.innerHTML = '<div style="color:var(--tx3);font-size:14px;padding:.5rem">Media unavailable</div>'; return; }
+  var escapedPath = (path||'').replace(/'/g, "\\'");
+  if(fileType&&fileType.startsWith('video')){
+    targetEl.innerHTML = '<video src="'+url+'" controls data-mediapath="'+escapedPath+'" onerror="retrySignedMedia(this)" style="width:100%;border-radius:var(--rs);max-height:400px;background:#000;'+(extraStyle||'')+'"></video>';
+  } else {
+    targetEl.innerHTML = '<img src="'+url+'" data-mediapath="'+escapedPath+'" onerror="retrySignedMedia(this)" style="width:100%;border-radius:var(--rs);max-height:400px;object-fit:contain;background:var(--bg3);cursor:pointer;'+(extraStyle||'')+'" onclick="window.open(this.src,\'_blank\')">';
+  }
+}
+
+// Auto-retry: when an img/video fails to load (e.g. expired signed URL), fetch a fresh one.
+// Limits to 2 retries per element to avoid infinite loops.
+async function retrySignedMedia(el){
+  var retries = parseInt(el.getAttribute('data-retries')||'0');
+  if(retries >= 2){ return; } // give up after 2 attempts
+  el.setAttribute('data-retries', retries+1);
+  var path = el.getAttribute('data-mediapath');
+  if(!path) return;
+  var url = await getSignedUrl(path);
+  if(url){ el.src = url; }
+}
 var loadDataInFlight = null;
 async function loadData(){
   // If a load is already in progress, wait for it instead of starting a new overlapping one
@@ -1110,6 +1148,20 @@ async function loadData(){
   } finally {
     loadDataInFlight = null;
   }
+}
+
+// ── AUTO-LOAD SIGNED SCREENSHOTS ─────────────────────────────────────────────
+// After any tab renders, find all .sshot-lazy placeholders and replace with signed images
+async function loadSignedScreenshots(){
+  var els = document.querySelectorAll('.sshot-lazy[data-sspath]');
+  await Promise.all(Array.from(els).map(async function(el){
+    var path = el.getAttribute('data-sspath');
+    el.removeAttribute('data-sspath'); // prevent double-loading
+    var url = await getSignedUrl(path);
+    if(!url){ el.innerHTML = '<div style="color:var(--tx3);font-size:13px;padding:.25rem">Media unavailable</div>'; return; }
+    var escapedPath = (path||'').replace(/'/g, "\\'");
+    el.innerHTML = '<img src="'+url+'" data-mediapath="'+escapedPath+'" onerror="retrySignedMedia(this)" style="width:100%;max-height:400px;object-fit:contain;background:var(--bg3);border-radius:var(--rs);cursor:pointer" onclick="window.open(this.src,\'_blank\')">';
+  }));
 }
 
 // ── AUTO-ADVANCE CURRENT WEEK ──────────────────────────────────────────────────
@@ -1167,6 +1219,7 @@ async function adminTab(tab){
   else if(tab==='prizes') c.innerHTML = renderAdminPrizes();
   else if(tab==='archive') { renderArchiveTab(c); }
   else if(tab==='rejected') c.innerHTML = renderAdminRejected();
+  setTimeout(loadSignedScreenshots, 100);
 }
 
 // ── ADMIN: REJECTED SUBMISSIONS ───────────────────────────────────────────────
@@ -1236,7 +1289,7 @@ function renderAdminRejected(){
         +'</div>'
         +'<div style="font-size:14px;color:var(--tx3);margin-bottom:6px">'+submittedAt+'</div>'
         +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">&ldquo;'+s.reflection.slice(0,100)+(s.reflection.length>100?'&hellip;':'')+'&rdquo;</div>'
-        +(s.screenshot_url?'<img src="'+s.screenshot_url+'" style="margin-top:6px;width:100%;max-height:160px;object-fit:contain;background:var(--bg3);border-radius:var(--rs);cursor:pointer" onclick="window.open(\''+s.screenshot_url+'\',\'_blank\')">':'')
+        +(s.screenshot_url?'<div class="sshot-lazy" data-sspath="'+s.screenshot_url+'" style="margin-top:6px;min-height:40px"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>':'')
         +'</div>';
     });
   }
@@ -2638,7 +2691,7 @@ function renderPartDevot(){
     html += '<span class="tag '+wsc+'" style="margin-bottom:.5rem;display:inline-block">'+wsl+'</span>'
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">Submitted: '+submittedAt+'</div>'
       +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">\u201c'+myWdsSub.reflection+'\u201d</div>';
-    if(myWdsSub.screenshot_url) html += '<img src="'+myWdsSub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:400px;object-fit:contain;background:var(--bg3);margin-bottom:.75rem;cursor:pointer" onclick="window.open(\''+myWdsSub.screenshot_url+'\',\'_blank\')">';
+    if(myWdsSub.screenshot_url) html += '<div class="sshot-lazy" data-sspath="'+myWdsSub.screenshot_url+'" style="width:100%;min-height:60px;margin-bottom:.75rem"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>';
     if(myWdsSub.status==='rejected'&&!weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
     if(myWdsSub.status==='rejected'&&weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed \u2014 resubmission closed</div>';
   } else if(weekExpired){
@@ -2709,7 +2762,7 @@ function renderPartDevot(){
         +'</div>'
         +'<div style="font-size:14px;color:var(--tx3);margin-bottom:4px">Submitted: '+subDate+'</div>'
         +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u201c'+s.reflection.slice(0,80)+(s.reflection.length>80?'...\u201d':'\u201d')+'</div>'
-        +(s.screenshot_url?'<img src="'+s.screenshot_url+'" style="margin-top:6px;width:100%;max-height:300px;object-fit:contain;background:var(--bg3);border-radius:var(--rs);cursor:pointer" onclick="window.open(\''+s.screenshot_url+'\',\'_blank\')">':'')
+        +(s.screenshot_url?'<div class="sshot-lazy" data-sspath="'+s.screenshot_url+'" style="margin-top:6px;min-height:60px"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>':'')
         +'</div>';
     });
     html += '</div>';
@@ -2963,6 +3016,7 @@ async function refreshCurrentTab(){
   else if(PROFILE.role === 'challenge_manager') await chmgrTab(chmgrCurrentTab);
   else if(PROFILE.role === 'devotion_leader') await devldrTab(devldrCurrentTab);
   else await partTab(partCurrentTab);
+  setTimeout(loadSignedScreenshots, 100); // load signed screenshots after render
 }
 
 // ── TEAM MODAL ────────────────────────────────────────────────────────────────
@@ -3341,7 +3395,7 @@ async function saveSubmission(){
       };
       xhr.onload = function(){
         if(xhr.status===200||xhr.status===201){
-          resolve(supabaseUrl+'/storage/v1/object/public/challenge-media/'+path);
+          resolve(supabaseUrl+'/storage/v1/object/challenge-media/'+path);
         } else {
           var msg = 'Upload failed';
           try { msg = JSON.parse(xhr.responseText).message||msg; } catch(e){}
@@ -3362,7 +3416,7 @@ async function saveSubmission(){
 
     var dbRes = await sb.from('challenge_submissions').upsert({
       participant_id:PROFILE.id, challenge_id:submittingChallengeId,
-      file_url:publicUrl, file_type:selectedFile.type,
+      file_url:path, file_type:selectedFile.type,
       file_path:path, caption:caption||null, status:'pending'
     },{onConflict:'participant_id,challenge_id'});
     if(dbRes.error) throw new Error(dbRes.error.message);
@@ -3394,8 +3448,7 @@ async function viewSubmission(subId){
   var body = document.getElementById('m-view-sub-body');
   body.innerHTML = '<div style="margin-bottom:.75rem"><div style="font-size:18px;font-weight:500;margin-bottom:3px">'+ch.description+'</div>'
     +'<div style="font-size:15px;color:var(--tx3)">Week '+ch.week+' · '+participant.full_name+'</div></div>'
-    +(isVideo?'<video src="'+sub.file_url+'" controls style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:400px;background:#000"></video>'
-    :'<img src="'+sub.file_url+'" style="width:100%;border-radius:var(--rs);margin-bottom:.75rem;max-height:400px;object-fit:contain;background:var(--bg3);cursor:pointer" onclick="window.open(\''+sub.file_url+'\',\'_blank\')">')
+    +'<div id="vsub-media" style="margin-bottom:.75rem"><div style="color:var(--tx3);font-size:14px;padding:.5rem">Loading media...</div></div>'
     +(sub.caption?'<div style="font-size:18px;color:var(--tx2);font-style:italic;margin-bottom:.75rem">"'+sub.caption+'"</div>':'')
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">'
     +'<span class="tag '+sc+'">'+(sub.status==='approved'?'&#10003; Approved':sub.status==='rejected'?'&#10007; Rejected':'&#9203; Pending review')+'</span>'
@@ -3407,6 +3460,9 @@ async function viewSubmission(subId){
     +'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="reviewSubmission(\''+sub.id+'\',\'approved\')">&#10003; Approve</button>'
     +'</div>':'');
   openModal('m-view-sub');
+  // Load signed URL for media after modal opens
+  var mediaEl = document.getElementById('vsub-media');
+  if(mediaEl) renderSignedMedia(sub.file_url||sub.file_path, sub.file_type, mediaEl);
 }
 async function openReviewModal(challengeId){
   await loadData();
@@ -3581,8 +3637,7 @@ async function saveWeeklyDevotSub(){
   var upRes = await sb.storage.from('challenge-media').upload(path, wdsFile, {cacheControl:'3600',upsert:true,contentType:wdsFile.type});
   if(upRes.error){ err.textContent=upRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('wds-progress').style.display='none'; return; }
   fill.style.width='75%';
-  var urlData = sb.storage.from('challenge-media').getPublicUrl(path);
-  var dbRes = await sb.from('weekly_devot_submissions').upsert({participant_id:PROFILE.id, week:wdsTargetWeek, reflection:reflection, screenshot_url:urlData.data.publicUrl, screenshot_path:path, status:'pending', pts_awarded:null},{onConflict:'participant_id,week'});
+  var dbRes = await sb.from('weekly_devot_submissions').upsert({participant_id:PROFILE.id, week:wdsTargetWeek, reflection:reflection, screenshot_url:path, screenshot_path:path, status:'pending', pts_awarded:null},{onConflict:'participant_id,week'});
   if(dbRes.error){ err.textContent=dbRes.error.message; btn.disabled=false; btn.style.opacity='1'; document.getElementById('wds-progress').style.display='none'; return; }
   fill.style.width='100%';
   setTimeout(async function(){ closeModal('m-weekly-devot'); toast('Weekly devotional submitted! &#128218;'); await refreshCurrentTab(); },400);
@@ -3600,7 +3655,7 @@ function openWeeklyReview(subId){
     +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(m.full_name)+'</div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:20px;font-weight:500">'+m.full_name+'</div>'
     +'<div style="font-size:15px;color:var(--tx3)">Week '+sub.week+' · '+submittedAt+' · <span class="tag '+sc+'" style="font-size:14px">'+sub.status+'</span></div></div></div>'
-    +'<img src="'+sub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:220px;object-fit:cover;margin-bottom:.875rem;cursor:pointer" onclick="window.open(\''+sub.screenshot_url+'\',\'_blank\')">'
+    +'<div class="sshot-lazy" data-sspath="'+sub.screenshot_url+'" style="width:100%;min-height:60px;margin-bottom:.875rem"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>'
     +'<div style="font-size:16px;color:var(--tx3);margin-bottom:4px">Reflection</div>'
     +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.65;margin-bottom:1rem">"'+sub.reflection+'"</div>'
     +(sub.participant_id===PROFILE.id
@@ -3866,8 +3921,7 @@ function openWeeklyArchive(week){
         +'<span class="tag '+sc+'" style="font-size:14px">'+(sub.status==='approved'?'&#10003; +'+sub.pts_awarded+'pt':sub.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
         +'</div>'
         +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">"'+sub.reflection+'"</div>'
-        +'<img src="'+sub.screenshot_url+'" style="width:100%;border-radius:var(--rs);max-height:180px;object-fit:cover;cursor:pointer;margin-bottom:'+(sub.status==='pending'?'.75rem':'0')+'" onclick="window.open(\''+sub.screenshot_url+'\',\'_blank\')">'
-        +(sub.status==='pending'?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:.75rem">'
+        +(sub.status==='pending'?'<div class="sshot-lazy" data-sspath="'+sub.screenshot_url+'" style="width:100%;min-height:60px"></div>'
           +'<button class="btn btn-danger" style="height:36px;font-size:12px" onclick="reviewWeeklyDevot(\''+sub.id+'\',\'rejected\',0);setTimeout(function(){loadData().then(function(){openWeeklyArchive('+week+')})},600)">&#10007; Reject</button>'
           +'<button class="btn btn-g" style="height:36px;font-size:12px" onclick="closeModal(\'m-weekly-archive\');openWeeklyReview(\''+sub.id+'\')">&#10003; Approve</button>'
           +'</div>':'')
