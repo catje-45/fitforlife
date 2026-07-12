@@ -518,6 +518,20 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div class="err" id="ml-err"></div>
 </div></div>
 
+<!-- Award Bonus Points (admin only) -->
+<div class="modal-bg" id="m-bonus"><div class="modal">
+  <div class="modal-head"><span class="modal-title">⭐ Award bonus points</span><button class="modal-x" onclick="closeModal('m-bonus')">✕</button></div>
+  <div class="field"><div class="flabel">Participant</div><select class="inp" id="mb-p"></select></div>
+  <div class="field"><div class="flabel">Week</div><select class="inp" id="mb-w"></select></div>
+  <div class="field">
+    <div class="flabel">Bonus points</div>
+    <input class="inp" id="mb-pts" type="number" step="0.5" min="0" placeholder="e.g. 2">
+    <div style="font-size:15px;color:var(--tx3);margin-top:4px">Added on top of weight, devotional and challenge points for the selected week. Set to 0 to remove a previously awarded bonus.</div>
+  </div>
+  <button class="btn btn-g" onclick="saveBonus()">Award bonus</button>
+  <div class="err" id="mb-err"></div>
+</div></div>
+
 <!-- Log Devotional -->
 <div class="modal-bg" id="m-devot"><div class="modal">
   <div class="modal-head"><span class="modal-title">📖 Log devotional</span><button class="modal-x" onclick="closeModal('m-devot')">✕</button></div>
@@ -1321,6 +1335,7 @@ function renderAdminDash(){
     +'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openTeamModal()">+ New team</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openLogModal()">&#9878; Log weight</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openChallengeModal()">+ Challenge</button>'
+    +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openBonusModal()">&#11088; Bonus points</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openSettingsModal()">&#9881; Settings</button>'
     +'</div></div>';
   return html + '</div>';
@@ -2826,8 +2841,9 @@ function renderPartChallenges(){
   var html = '<div style="padding-bottom:1rem">';
   if(roMode) html += readOnlyBanner();
 
-  // Show current week + up to 3 previous weeks (4 weeks total) as open for submission
-  var minOpenWeek = Math.max(1, SETTINGS.current_week - 3);
+  // Show current week + up to 3 previous weeks (4 weeks total) as open for submission.
+  // When late submissions are allowed, ALL past weeks are open.
+  var minOpenWeek = (SETTINGS && SETTINGS.allow_late_submissions) ? 1 : Math.max(1, SETTINGS.current_week - 3);
   var openWeeks = [];
   for(var w = SETTINGS.current_week; w >= minOpenWeek; w--) openWeeks.push(w);
 
@@ -3208,7 +3224,7 @@ async function saveEditLog(){
   // Recalculate pct_lost for this log entry
   var pctLost = parseFloat(((startWt - curWt) / startWt * 100).toFixed(2));
   var l = LOGS.find(function(x){ return x.id===editingLogId; });
-  var totalPts = parseFloat((Math.max(pctLost,0) + (l?l.devot_pts:0) + (l?l.challenge_pts:0)).toFixed(2));
+  var totalPts = parseFloat((Math.max(pctLost,0) + (l?l.devot_pts:0) + (l?l.challenge_pts:0) + (l?(l.bonus_pts||0):0)).toFixed(2));
   var logRes = await sb.from('logs').update({ weight: curWt, pct_lost: pctLost, total_pts: totalPts }).eq('id', editingLogId);
   if(logRes.error){ err.textContent='Log error: '+logRes.error.message; return; }
   closeModal('m-edit-log');
@@ -3231,8 +3247,9 @@ async function saveLog(){
   var existing = LOGS.find(function(l){ return l.participant_id===pid&&l.week===week; });
   var devotPts = existing ? existing.devot_pts : 0;
   var challengePts = existing ? existing.challenge_pts : 0;
-  var totalPts = parseFloat((Math.max(pctLost,0)+devotPts+challengePts).toFixed(2));
-  var res = await sb.from('logs').upsert({participant_id:pid, week:week, weight:wt, pct_lost:pctLost, devot_pts:devotPts, challenge_pts:challengePts, total_pts:totalPts},{onConflict:'participant_id,week'});
+  var bonusPts = existing ? (existing.bonus_pts||0) : 0;
+  var totalPts = parseFloat((Math.max(pctLost,0)+devotPts+challengePts+bonusPts).toFixed(2));
+  var res = await sb.from('logs').upsert({participant_id:pid, week:week, weight:wt, pct_lost:pctLost, devot_pts:devotPts, challenge_pts:challengePts, bonus_pts:bonusPts, total_pts:totalPts},{onConflict:'participant_id,week'});
   if(res.error){ err.textContent=res.error.message; return; }
   closeModal('m-log'); toast('Weight entry saved!');
   await refreshCurrentTab();
@@ -3241,6 +3258,52 @@ async function deleteLog(id){
   if(!confirm('Delete this entry?')) return;
   await sb.from('logs').delete().eq('id',id);
   toast('Entry deleted'); await refreshCurrentTab();
+}
+
+// ── BONUS POINTS (admin only — not challenge managers or devotion leaders) ────
+function openBonusModal(){
+  if(!PROFILE || (PROFILE.role!=='admin' && PROFILE.role!=='super_admin')){ toast('Only admins can award bonus points'); return; }
+  document.getElementById('mb-err').textContent='';
+  var ps = document.getElementById('mb-p');
+  ps.innerHTML = MEMBERS.filter(function(m){ return !['pending'].includes(m.role); })
+    .map(function(m){ return '<option value="'+m.id+'">'+m.full_name+'</option>'; }).join('');
+  var ws = document.getElementById('mb-w');
+  ws.innerHTML = Array.from({length:13},function(_,i){ return '<option value="'+(i+1)+'"'+(i+1===SETTINGS.current_week?' selected':'')+'>'+'Week '+(i+1)+'</option>'; }).join('');
+  // Prefill current bonus when participant/week changes
+  function prefillBonus(){
+    var l = LOGS.find(function(x){ return x.participant_id===ps.value && x.week===parseInt(ws.value); });
+    document.getElementById('mb-pts').value = l ? (l.bonus_pts||0) : 0;
+  }
+  ps.onchange = prefillBonus; ws.onchange = prefillBonus;
+  prefillBonus();
+  openModal('m-bonus');
+}
+
+async function saveBonus(){
+  var err = document.getElementById('mb-err');
+  if(!PROFILE || (PROFILE.role!=='admin' && PROFILE.role!=='super_admin')){ err.textContent='Only admins can award bonus points'; return; }
+  var pid = document.getElementById('mb-p').value;
+  var week = parseInt(document.getElementById('mb-w').value);
+  var bonus = parseFloat(document.getElementById('mb-pts').value);
+  if(!pid){ err.textContent='Select participant'; return; }
+  if(isNaN(bonus)||bonus<0){ err.textContent='Enter a valid bonus (0 or more)'; return; }
+  var m = MEMBERS.find(function(x){ return x.id===pid; });
+  // Re-query log row fresh from DB
+  var logRes = await sb.from('logs').select('*').eq('participant_id',pid).eq('week',week).maybeSingle();
+  var existing = logRes.data;
+  if(existing){
+    var weightPts = (m && m.track_weight===false) ? 0 : Math.max(existing.pct_lost||0, 0);
+    var newTotal = parseFloat((weightPts + (existing.devot_pts||0) + (existing.challenge_pts||0) + bonus).toFixed(2));
+    var res = await sb.from('logs').update({bonus_pts:bonus, total_pts:newTotal}).eq('id',existing.id);
+    if(res.error){ err.textContent=res.error.message; return; }
+  } else {
+    var wt = (m && m.track_weight===false) ? 0 : ((m && m.start_weight)||0);
+    var res2 = await sb.from('logs').insert({participant_id:pid, week:week, weight:wt, pct_lost:0, devot_pts:0, challenge_pts:0, bonus_pts:bonus, total_pts:bonus});
+    if(res2.error){ err.textContent=res2.error.message; return; }
+  }
+  closeModal('m-bonus');
+  toast('&#11088; Bonus of '+bonus+' pt'+(bonus!==1?'s':'')+' awarded to '+((m&&m.full_name)||'participant')+' for Week '+week);
+  await refreshCurrentTab();
 }
 
 // ── CHALLENGE MODAL ───────────────────────────────────────────────────────────
@@ -3499,7 +3562,7 @@ async function reviewSubmission(subId, status){
       var existing = logRes.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + existing.devot_pts + chPts).toFixed(2));
+        var newTotal = parseFloat((weightPts + existing.devot_pts + chPts + (existing.bonus_pts||0)).toFixed(2));
         await sb.from('logs').update({challenge_pts:chPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
@@ -3744,7 +3807,7 @@ async function reviewWeeklyDevot(subId, status, pts){
       var existing = logResW.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
+        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts + (existing.bonus_pts||0)).toFixed(2));
         await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
@@ -4185,7 +4248,7 @@ async function reviewDailyResponse(id, status){
       var existing = logResD.data;
       if(existing){
         var weightPts = mem.track_weight===false ? 0 : Math.max(existing.pct_lost,0);
-        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts).toFixed(2));
+        var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts + (existing.bonus_pts||0)).toFixed(2));
         await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
       } else {
         var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
