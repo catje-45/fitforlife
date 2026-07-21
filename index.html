@@ -576,6 +576,25 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <button class="btn btn-g" onclick="saveChallenge()">Add challenge</button>
 </div></div>
 
+<!-- Edit Challenge (admin only) -->
+<div class="modal-bg" id="m-edit-challenge"><div class="modal">
+  <div class="modal-head"><span class="modal-title">✎ Edit challenge</span><button class="modal-x" onclick="closeModal('m-edit-challenge')">✕</button></div>
+  <div class="field"><div class="flabel">Description</div><input class="inp" id="ech-desc"></div>
+  <div class="inp-row">
+    <div class="field"><div class="flabel">Difficulty</div>
+      <select class="inp" id="ech-diff">
+        <option value="1">Easy — 1 pt</option>
+        <option value="2">Medium — 2 pts</option>
+        <option value="3">Hard — 3 pts</option>
+      </select>
+    </div>
+    <div class="field"><div class="flabel">Week</div><select class="inp" id="ech-wk"></select></div>
+  </div>
+  <div style="font-size:14px;color:var(--tx3);margin-bottom:.75rem">Changing points or week automatically recalculates scores for everyone with an approved submission on this challenge.</div>
+  <button class="btn btn-g" onclick="saveEditChallenge()">Save changes</button>
+  <div class="err" id="ech-err"></div>
+</div></div>
+
 <!-- Submit Challenge Proof -->
 <div class="modal-bg" id="m-submit"><div class="modal">
   <div class="modal-head"><span class="modal-title">📸 Submit proof</span><button class="modal-x" onclick="closeModal('m-submit')">✕</button></div>
@@ -2217,7 +2236,7 @@ function renderAdminChallenges(){
         +'<div class="chi-text" style="flex:1">'+ch.description+'</div>'
         +'<span class="tag '+d.cls+'">'+d.l+'</span>'
         +'<span class="tag tgray">+'+ch.pts+'pt</span>'
-        +(PROFILE&&PROFILE.role==='admin'?'<button class="btn-sm btn-sm-danger" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>':'')
+        +(PROFILE&&(PROFILE.role==='admin'||PROFILE.role==='super_admin')?'<button class="btn-sm btn-sm-ghost" onclick="openEditChallengeModal(\''+ch.id+'\')">&#9998;</button><button class="btn-sm btn-sm-danger" onclick="removeChallenge(\''+ch.id+'\')">&#10005;</button>':'')
         +'</div>';
 
       if(!chSubs.length){
@@ -3322,9 +3341,83 @@ async function saveChallenge(){
   closeModal('m-challenge'); toast('Challenge added!');
   await refreshCurrentTab();
 }
+// Recalculate a participant's challenge_pts + total for one week (uses fresh DB + current CHALLENGES)
+async function recalcChallengeWeek(pid, week){
+  var subsRes = await sb.from('challenge_submissions').select('challenge_id').eq('participant_id',pid).eq('status','approved');
+  var chPts = 0;
+  (subsRes.data||[]).forEach(function(r){
+    var cc = CHALLENGES.find(function(x){ return x.id===r.challenge_id; });
+    if(cc && cc.week===week) chPts += cc.pts;
+  });
+  var mem = MEMBERS.find(function(x){ return x.id===pid; });
+  var logRes = await sb.from('logs').select('*').eq('participant_id',pid).eq('week',week).maybeSingle();
+  var existing = logRes.data;
+  if(existing){
+    var weightPts = (mem && mem.track_weight===false) ? 0 : Math.max(existing.pct_lost||0, 0);
+    var newTotal = parseFloat((weightPts + (existing.devot_pts||0) + chPts + (existing.bonus_pts||0)).toFixed(2));
+    await sb.from('logs').update({challenge_pts:chPts, total_pts:newTotal}).eq('id',existing.id);
+  } else if(chPts > 0){
+    var wt = (mem && mem.track_weight===false) ? 0 : ((mem && mem.start_weight)||0);
+    await sb.from('logs').insert({participant_id:pid, week:week, weight:wt, pct_lost:0, devot_pts:0, challenge_pts:chPts, bonus_pts:0, total_pts:chPts});
+  }
+}
+
 async function removeChallenge(id){
-  await sb.from('challenges').delete().eq('id',id);
-  toast('Challenge removed'); await refreshCurrentTab();
+  if(!PROFILE || (PROFILE.role!=='admin' && PROFILE.role!=='super_admin')){ toast('Only admins can remove challenges'); return; }
+  var ch = CHALLENGES.find(function(x){ return x.id===id; });
+  if(!confirm('Remove this challenge'+(ch?' ("'+ch.description+'")':'')+'? Scores for anyone with an approved submission will be recalculated.')) return;
+  // Capture affected participants BEFORE deleting
+  var subsRes = await sb.from('challenge_submissions').select('participant_id').eq('challenge_id',id).eq('status','approved');
+  var pids = Array.from(new Set((subsRes.data||[]).map(function(r){ return r.participant_id; })));
+  var week = ch ? ch.week : null;
+  var res = await sb.from('challenges').delete().eq('id',id);
+  if(res.error){ toast('Error: '+res.error.message); return; }
+  await loadData(); // refresh CHALLENGES before recalc
+  if(week){ for(var i=0;i<pids.length;i++){ await recalcChallengeWeek(pids[i], week); } }
+  toast('Challenge removed'+(pids.length?' · '+pids.length+' score'+(pids.length!==1?'s':'')+' recalculated':''));
+  await refreshCurrentTab();
+}
+
+var editingChallengeId = null;
+function openEditChallengeModal(id){
+  if(!PROFILE || (PROFILE.role!=='admin' && PROFILE.role!=='super_admin')){ toast('Only admins can edit challenges'); return; }
+  var ch = CHALLENGES.find(function(x){ return x.id===id; });
+  if(!ch) return;
+  editingChallengeId = id;
+  document.getElementById('ech-desc').value = ch.description;
+  document.getElementById('ech-diff').value = ch.pts;
+  document.getElementById('ech-wk').innerHTML = Array.from({length:13},function(_,i){ return '<option value="'+(i+1)+'"'+(i+1===ch.week?' selected':'')+'>'+'Week '+(i+1)+'</option>'; }).join('');
+  document.getElementById('ech-err').textContent='';
+  openModal('m-edit-challenge');
+}
+
+async function saveEditChallenge(){
+  var err = document.getElementById('ech-err');
+  if(!PROFILE || (PROFILE.role!=='admin' && PROFILE.role!=='super_admin')){ err.textContent='Only admins can edit challenges'; return; }
+  var ch = CHALLENGES.find(function(x){ return x.id===editingChallengeId; });
+  if(!ch){ err.textContent='Challenge not found'; return; }
+  var desc = document.getElementById('ech-desc').value.trim();
+  var pts = parseInt(document.getElementById('ech-diff').value);
+  var week = parseInt(document.getElementById('ech-wk').value);
+  if(!desc){ err.textContent='Description cannot be empty'; return; }
+  var oldWeek = ch.week, oldPts = ch.pts;
+  var res = await sb.from('challenges').update({description:desc, pts:pts, week:week}).eq('id',editingChallengeId);
+  if(res.error){ err.textContent=res.error.message; return; }
+  // Recalculate scores if points or week changed
+  if(pts!==oldPts || week!==oldWeek){
+    var subsRes = await sb.from('challenge_submissions').select('participant_id').eq('challenge_id',editingChallengeId).eq('status','approved');
+    var pids = Array.from(new Set((subsRes.data||[]).map(function(r){ return r.participant_id; })));
+    await loadData(); // refresh CHALLENGES with new pts/week before recalc
+    var weeks = week===oldWeek ? [week] : [oldWeek, week];
+    for(var i=0;i<pids.length;i++){
+      for(var j=0;j<weeks.length;j++){ await recalcChallengeWeek(pids[i], weeks[j]); }
+    }
+    toast('Challenge updated · '+pids.length+' score'+(pids.length!==1?'s':'')+' recalculated');
+  } else {
+    toast('Challenge updated');
+  }
+  closeModal('m-edit-challenge');
+  await refreshCurrentTab();
 }
 
 // ── SETTINGS MODAL ────────────────────────────────────────────────────────────
