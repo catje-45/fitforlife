@@ -1427,16 +1427,17 @@ function renderSubmissionsTab(){
         var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
         var c = tc(ti<0?0:ti);
         var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-        html += '<div class="row-item" style="cursor:pointer;border-left:3px solid var(--warn)" onclick="openDailyResponseView(\''+r.id+'\')">'
+        html += '<div class="row-item" style="cursor:pointer;border-left:3px solid var(--warn);flex-direction:column;align-items:stretch;gap:8px" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div style="display:flex;align-items:center;gap:10px">'
           +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:17px;font-weight:600">'+m.full_name+'</div>'
           +'<div style="font-size:13px;color:var(--tx3)">'+submittedAt+'</div>'
           +'<div style="font-size:14px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
-          +'</div>'
-          +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
-          +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
+          +'</div></div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<button class="btn-sm btn-sm-danger" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\');refreshCurrentTab()">&#10007;</button>'
+          +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
           +'</div></div>';
       });
       approved.forEach(function(r){
@@ -1741,7 +1742,8 @@ function renderDevldrManage(){
         var isSelf = r.participant_id===PROFILE.id;
         var sc = r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray';
         var submittedAt = r.created_at?new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-        html += '<div class="row-item" style="cursor:pointer;'+(r.status==='pending'&&!isSelf?'border-left:3px solid var(--warn)':'')+'" onclick="openDailyResponseView(\''+r.id+'\')">'
+        html += '<div class="row-item" style="cursor:pointer;'+(r.status==='pending'&&!isSelf?'border-left:3px solid var(--warn);flex-direction:column;align-items:stretch;gap:8px':'')+'" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +(r.status==='pending'&&!isSelf?'<div style="display:flex;align-items:center;gap:10px">':'')
           +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:17px;font-weight:600">'+m.full_name+(isSelf?' <span style="font-size:12px;color:var(--g)">(you)</span>':'')+'</div>'
@@ -1749,9 +1751,9 @@ function renderDevldrManage(){
           +'<div style="font-size:14px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,55)+(r.reflection.length>55?'...':'')+'"</div>'
           +'</div>'
           +(r.status==='pending'&&!isSelf
-            ?'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
-              +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
+            ?'</div><div style="display:flex;justify-content:space-between;align-items:center">'
               +'<button class="btn-sm btn-sm-danger" style="height:26px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\');refreshCurrentTab()">&#10007;</button>'
+              +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:12px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
               +'</div>'
             :'<span class="tag '+sc+'" style="flex-shrink:0;margin-left:8px;font-size:12px">'+(r.status==='approved'?'&#10003;':r.status==='rejected'?'&#10007;':'&#9203;')+'</span>'
           )
@@ -2019,16 +2021,17 @@ function renderAdminDevot(){
         var ti = TEAMS.findIndex(function(t){ return t.id===m.team_id; });
         var c = tc(ti<0?0:ti);
         var submittedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-        html += '<div class="row-item" style="cursor:pointer" onclick="openDailyResponseView(\''+r.id+'\')">'
+        html += '<div class="row-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:8px" onclick="openDailyResponseView(\''+r.id+'\')">'
+          +'<div style="display:flex;align-items:center;gap:10px">'
           +'<div class="av" style="background:'+c.bg+';color:'+c.fg+';width:32px;height:32px;font-size:11px;flex-shrink:0">'+initials(m.full_name)+'</div>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.full_name+'</div>'
           +'<div style="font-size:14px;color:var(--tx3)">'+d.title+' · '+submittedAt+'</div>'
           +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"'+r.reflection.slice(0,60)+(r.reflection.length>60?'...':'')+'"</div>'
-          +'</div>'
-          +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;margin-left:8px">'
-          +'<button class="btn-sm btn-sm-g" style="height:30px;font-size:13px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\')">&#10003;</button>'
+          +'</div></div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<button class="btn-sm btn-sm-danger" style="height:30px;font-size:13px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'rejected\')">&#10007;</button>'
+          +'<button class="btn-sm btn-sm-g" style="height:30px;font-size:13px" onclick="event.stopPropagation();reviewDailyResponse(\''+r.id+'\',\'approved\')">&#10003;</button>'
           +'</div></div>';
       });
     }
@@ -2258,15 +2261,16 @@ function renderAdminChallenges(){
           var mem = MEMBERS.find(function(x){ return x.id===s.participant_id; })||{full_name:'?',team_id:''};
           var mti = TEAMS.findIndex(function(t){ return t.id===mem.team_id; });
           var mc = tc(mti<0?0:mti);
-          html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="viewSubmission(\''+s.id+'\')">'
+          html += '<div class="row-item" style="border-bottom:1px solid var(--bdr);cursor:pointer;flex-direction:column;align-items:stretch;gap:8px" onclick="viewSubmission(\''+s.id+'\')">'
+            +'<div style="display:flex;align-items:center;gap:10px">'
             +'<div class="av" style="background:'+mc.bg+';color:'+mc.fg+';width:30px;height:30px;font-size:11px;flex-shrink:0">'+initials(mem.full_name)+'</div>'
             +'<div style="flex:1;min-width:0">'
             +'<div style="font-size:17px;font-weight:600">'+mem.full_name+'</div>'
             +(s.caption?'<div style="font-size:14px;color:var(--tx3);font-style:italic">'+s.caption+'</div>':'')
-            +'</div>'
-            +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:8px">'
-            +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewSubmission(\''+s.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
+            +'</div></div>'
+            +'<div style="display:flex;justify-content:space-between;align-items:center">'
             +'<button class="btn-sm btn-sm-danger" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewSubmission(\''+s.id+'\',\'rejected\');refreshCurrentTab()">&#10007;</button>'
+            +'<button class="btn-sm btn-sm-g" style="height:28px;font-size:12px" onclick="event.stopPropagation();reviewSubmission(\''+s.id+'\',\'approved\');refreshCurrentTab()">&#10003;</button>'
             +'</div></div>';
         });
 
@@ -4055,11 +4059,11 @@ function openDailyArchive(devotId){
         +'<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:600">'+m.full_name+'</div>'
         +'<div style="font-size:15px;color:var(--tx3)">'+submittedAt+'</div></div>'
         +'<span class="tag '+sc+'" style="font-size:14px">'+(r.status==='approved'?'&#10003; Approved':r.status==='rejected'?'&#10007; Rejected':'&#9203; Pending')+'</span>'
-        +(r.status==='pending'?'<div style="display:flex;gap:4px">'
-          +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'approved\');setTimeout(function(){loadData().then(function(){openDailyArchive(\''+devotId+'\')})},600)">&#10003;</button>'
-          +'<button class="btn-sm btn-sm-danger" style="height:26px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'rejected\');setTimeout(function(){loadData().then(function(){openDailyArchive(\''+devotId+'\')})},600)">&#10007;</button>'
-          +'</div>':'')
         +'</div>'
+        +(r.status==='pending'?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">'
+          +'<button class="btn-sm btn-sm-danger" style="height:26px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'rejected\');setTimeout(function(){loadData().then(function(){openDailyArchive(\''+devotId+'\')})},600)">&#10007;</button>'
+          +'<button class="btn-sm btn-sm-g" style="height:26px;font-size:11px" onclick="reviewDailyResponse(\''+r.id+'\',\'approved\');setTimeout(function(){loadData().then(function(){openDailyArchive(\''+devotId+'\')})},600)">&#10003;</button>'
+          +'</div>':'')
         +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6">"'+r.reflection+'"</div>'
         +'</div>';
     });
