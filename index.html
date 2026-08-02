@@ -1828,12 +1828,16 @@ function renderAdminMembers(){
   if(PENDING.length){
     html += '<div class="c"><div class="section-head"><div class="c-title" style="margin:0;color:var(--warn)">&#9888; Pending ('+PENDING.length+')</div></div>';
     PENDING.forEach(function(p){
-      html += '<div class="pending-card">'
+      html += '<div class="pending-card" style="flex-direction:column;align-items:stretch;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:10px">'
         +'<div class="av" style="background:var(--gdim);color:var(--g)">'+initials(p.full_name)+'</div>'
         +'<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.full_name+'</div>'
         +'<div style="font-size:13px;color:var(--tx3)">'+p.email+'</div></div>'
-        +'<button class="btn-sm btn-sm-g" onclick="openAssignModal(\''+p.id+'\',\''+esc(p.full_name)+'\')">Approve</button>'
-        +'<button class="btn-sm btn-sm-danger" style="margin-left:4px" onclick="declineMember(\''+p.id+'\',\''+esc(p.full_name)+'\')">Decline</button>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<button class="btn-sm btn-sm-danger" onclick="declineMember(\''+p.id+'\',\''+esc(p.full_name)+'\')">&#10007; Decline</button>'
+        +'<button class="btn-sm btn-sm-g" onclick="openAssignModal(\''+p.id+'\',\''+esc(p.full_name)+'\')">&#10003; Approve</button>'
+        +'</div>'
         +'</div>';
     });
     html += '</div>';
