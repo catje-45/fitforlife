@@ -1740,7 +1740,8 @@ function renderDevldrManage(){
       +'<div style="font-family:var(--head);font-size:17px;font-weight:700;color:'+(isToday?'var(--g)':'var(--tx)')+'">'+(isToday?'Today — ':'')+formatDate(d.date)+'</div>'
       +'<div style="font-size:13px;color:var(--tx3)">'+d.title+'</div>'
       +'</div>'
-      +'<div style="display:flex;gap:5px;flex-shrink:0">'
+      +'<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'
+      +'<button class="btn-sm btn-sm-ghost" style="font-size:11px" onclick="event.stopPropagation();openEditDevotModal(\''+d.id+'\')">&#9998; Edit</button>'
       +(pending.length?'<span class="tag" style="background:var(--warndim);color:var(--warn);font-size:12px">&#9203; '+pending.length+'</span>':'')
       +(approved.length?'<span class="tag tg" style="font-size:12px">&#10003; '+approved.length+'</span>':'')
       +(!responses.length?'<span class="tag tgray" style="font-size:12px">None</span>':'')
