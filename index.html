@@ -321,6 +321,9 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <button class="nvb" id="an-lb" onclick="adminTab('lb')">
       <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Leaderboard
     </button>
+    <button class="nvb" id="an-weightloss" onclick="adminTab('weightloss')">
+      <svg viewBox="0 0 24 24"><path d="M6 3h12M8 3v3.5a4 4 0 004 4 4 4 0 004-4V3M8 21h8M8 21v-3.5a4 4 0 014-4 4 4 0 014 4V21"/></svg>Weight Loss
+    </button>
     <button class="nvb" id="an-prizes" onclick="adminTab('prizes')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Prizes
     </button>
@@ -1263,6 +1266,7 @@ async function adminTab(tab){
   else if(tab==='members') c.innerHTML = renderAdminMembers();
   else if(tab==='log') c.innerHTML = renderAdminLog();
   else if(tab==='lb') c.innerHTML = renderAdminLb();
+  else if(tab==='weightloss') c.innerHTML = renderAdminWeightLoss();
   else if(tab==='devot') c.innerHTML = renderDevldrManage();
   else if(tab==='challenges') c.innerHTML = renderAdminChallenges();
   else if(tab==='prizes') c.innerHTML = renderAdminPrizes();
@@ -2870,6 +2874,53 @@ function renderPartLb(){
   if(!pts.length) html += '<div class="empty" style="padding:1rem">No data yet</div>';
   var maxPts = pts[0]?pts[0].total||1:1;
   pts.forEach(function(x,i){ html += lbItem(x,i,maxPts,true); });
+  html += '</div></div>';
+  return html;
+}
+
+// ── ADMIN: WEIGHT LOSS RANKING ────────────────────────────────────────────────
+function renderAdminWeightLoss(){
+  var weightMembers = MEMBERS.filter(function(m){ return m.role!=='pending' && m.track_weight!==false; });
+  var rows = weightMembers.map(function(m){
+    var mLogs = LOGS.filter(function(l){ return l.participant_id===m.id; });
+    var latest = mLogs.slice().sort(function(a,b){ return b.week-a.week; })[0];
+    var startWt = m.start_weight||null;
+    var curWt = latest ? latest.weight : null;
+    var pctLost = latest ? (latest.pct_lost||0) : 0;
+    var kgLost = (startWt && curWt) ? parseFloat((startWt-curWt).toFixed(1)) : 0;
+    return {m:m, startWt:startWt, curWt:curWt, pctLost:pctLost, kgLost:kgLost, hasLog:!!latest};
+  }).sort(function(a,b){ return b.pctLost-a.pctLost; });
+
+  var html = '<div style="padding-bottom:1rem">'
+    +'<div class="section-head"><span style="font-family:var(--head);font-size:22px;font-weight:700">&#9878; Weight Loss Ranking</span></div>'
+    +'<div class="c"><div class="c-title">Ranked by % weight lost <span style="font-size:14px;font-weight:400;color:var(--tx3)">'+rows.length+' tracking</span></div>';
+
+  if(!rows.length){
+    html += '<div class="empty" style="padding:1rem"><span class="empty-icon">&#9878;</span>No weight-tracking participants</div>';
+  } else {
+    var maxPct = Math.max(rows[0].pctLost, 1);
+    rows.forEach(function(x,i){
+      var ti = TEAMS.findIndex(function(t){ return t.id===x.m.team_id; });
+      var c = tc(ti<0?0:ti);
+      var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
+      var rc = i===0?'var(--gold)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--tx3)';
+      var barW = Math.max(0, Math.round((x.pctLost/maxPct)*100));
+      var teamName = (TEAMS.find(function(t){ return t.id===x.m.team_id; })||{name:''}).name;
+      var weighInStr = (x.startWt&&x.curWt) ? x.startWt+'kg &#8594; '+x.curWt+'kg' : (x.startWt?'start: '+x.startWt+'kg':'no start weight');
+      html += '<div class="lb '+cls+'">'
+        +'<div class="lb-rank" style="color:'+rc+'">'+(i+1)+'</div>'
+        +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(x.m.full_name)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="lb-name">'+x.m.full_name+'</div>'
+        +'<div class="lb-sub">'+teamName+(teamName?' · ':'')+weighInStr+'</div>'
+        +'<div class="prog"><div class="prog-f" style="width:'+barW+'%"></div></div>'
+        +'</div>'
+        +'<div style="text-align:right;flex-shrink:0">'
+        +'<div class="lb-pts" style="color:'+(i===0?'var(--gold)':x.pctLost>0?'var(--g)':'var(--tx)')+'">'+x.pctLost.toFixed(1)+'%</div>'
+        +'<div style="font-size:15px;color:var(--tx3)">'+(x.hasLog?(x.kgLost>0?'-'+x.kgLost:x.kgLost<0?'+'+Math.abs(x.kgLost):'0')+'kg':'no weigh-in')+'</div>'
+        +'</div></div>';
+    });
+  }
   html += '</div></div>';
   return html;
 }
