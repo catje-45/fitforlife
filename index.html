@@ -810,6 +810,12 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div id="m-drv-body"></div>
 </div></div>
 
+<!-- Weight Loss Detail (per participant) -->
+<div class="modal-bg" id="m-weight-detail"><div class="modal">
+  <div class="modal-head"><span class="modal-title" id="wd-title">&#9878; Weight history</span><button class="modal-x" onclick="closeModal('m-weight-detail')">&#10005;</button></div>
+  <div id="wd-body"></div>
+</div></div>
+
 <!-- Edit Daily Reflection (admin only) -->
 <div class="modal-bg" id="m-edit-daily-response"><div class="modal">
   <div class="modal-head"><span class="modal-title">✎ Edit reflection</span><button class="modal-x" onclick="closeModal('m-edit-daily-response')">✕</button></div>
@@ -2907,7 +2913,7 @@ function renderAdminWeightLoss(){
       var barW = Math.max(0, Math.round((x.pctLost/maxPct)*100));
       var teamName = (TEAMS.find(function(t){ return t.id===x.m.team_id; })||{name:''}).name;
       var weighInStr = (x.startWt&&x.curWt) ? x.startWt+'kg &#8594; '+x.curWt+'kg' : (x.startWt?'start: '+x.startWt+'kg':'no start weight');
-      html += '<div class="lb '+cls+'">'
+      html += '<div class="lb '+cls+'" style="cursor:pointer" onclick="openWeightDetail(\''+x.m.id+'\')">'
         +'<div class="lb-rank" style="color:'+rc+'">'+(i+1)+'</div>'
         +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(x.m.full_name)+'</div>'
         +'<div style="flex:1;min-width:0">'
@@ -2923,6 +2929,49 @@ function renderAdminWeightLoss(){
   }
   html += '</div></div>';
   return html;
+}
+
+// ── ADMIN: INDIVIDUAL WEIGHT DETAIL ─────────────────────────────────────────────
+function openWeightDetail(pid){
+  var m = MEMBERS.find(function(x){ return x.id===pid; });
+  if(!m) return;
+  document.getElementById('wd-title').textContent = '⚖ '+m.full_name;
+  var mLogs = LOGS.filter(function(l){ return l.participant_id===pid; }).sort(function(a,b){ return a.week-b.week; });
+  var latest = mLogs.length ? mLogs[mLogs.length-1] : null;
+  var totalKgLost = (m.start_weight && latest) ? parseFloat((m.start_weight-latest.weight).toFixed(1)) : null;
+
+  var html2 = '<div style="display:flex;gap:.75rem;margin-bottom:1rem">'
+    +'<div style="flex:1;padding:.75rem;background:var(--bg3);border-radius:var(--rs);text-align:center">'
+    +'<div style="font-size:13px;color:var(--tx3)">Starting</div>'
+    +'<div style="font-size:22px;font-weight:700;font-family:var(--head)">'+(m.start_weight||'—')+'<span style="font-size:13px">kg</span></div>'
+    +'</div>'
+    +'<div style="flex:1;padding:.75rem;background:var(--bg3);border-radius:var(--rs);text-align:center">'
+    +'<div style="font-size:13px;color:var(--tx3)">Current</div>'
+    +'<div style="font-size:22px;font-weight:700;font-family:var(--head)">'+(latest?latest.weight:'—')+'<span style="font-size:13px">kg</span></div>'
+    +'</div>'
+    +'<div style="flex:1;padding:.75rem;background:var(--bg3);border-radius:var(--rs);text-align:center">'
+    +'<div style="font-size:13px;color:var(--tx3)">Total lost</div>'
+    +'<div style="font-size:22px;font-weight:700;font-family:var(--head);color:'+(totalKgLost>0?'var(--g)':'var(--tx)')+'">'+(totalKgLost!==null?totalKgLost+'kg':'—')+'</div>'
+    +'</div>'
+    +'</div>';
+
+  if(!mLogs.length){
+    html2 += '<div class="empty" style="padding:1rem"><span class="empty-icon">⚖️</span>No weigh-ins logged yet</div>';
+  } else {
+    html2 += '<div class="c-title" style="margin-bottom:.5rem">Weekly history</div>';
+    mLogs.slice().reverse().forEach(function(l){
+      var pc = l.pct_lost>=5?'var(--g)':l.pct_lost>0?'var(--tx2)':'var(--danger)';
+      var kgLost = m.start_weight ? parseFloat((m.start_weight-l.weight).toFixed(1)) : null;
+      html2 += '<div class="row-item">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">Week '+l.week+'</div>'
+        +'<div style="font-size:14px;color:var(--tx3)">'+l.weight+'kg'+(kgLost!==null?' · '+(kgLost>0?'-'+kgLost:kgLost<0?'+'+Math.abs(kgLost):'0')+'kg':'')+'</div></div>'
+        +'<div style="text-align:right;flex-shrink:0"><div style="font-size:18px;font-weight:500;color:'+pc+'">'+l.pct_lost.toFixed(1)+'%</div></div>'
+        +(PROFILE&&(PROFILE.role==='admin'||PROFILE.role==='super_admin')?'<button class="btn-sm btn-sm-ghost" style="margin-left:6px" onclick="closeModal(\'m-weight-detail\');openEditLogModal(\''+l.id+'\',\''+pid+'\')">Edit</button>':'')
+        +'</div>';
+    });
+  }
+  document.getElementById('wd-body').innerHTML = html2;
+  openModal('m-weight-detail');
 }
 
 // ── PARTICIPANT: CHALLENGES ───────────────────────────────────────────────────
@@ -3338,7 +3387,11 @@ async function saveLog(){
   var m = MEMBERS.find(function(x){ return x.id===pid; });
   if(!m){ err.textContent='Participant not found'; return; }
   if(m.track_weight === false){ err.textContent='This participant is in Devotion & Challenges only — weight tracking is disabled for them'; return; }
-  if(!m.start_weight){ err.textContent='Participant has no start weight set'; return; }
+  if(!m.start_weight){
+    err.innerHTML = m.full_name+' has no starting weight set — weight can\'t be logged until this is fixed.'
+      +'<button class="btn-sm btn-sm-g" style="margin-top:6px" onclick="closeModal(\'m-log\');openAssignModal(\''+m.id+'\',\''+esc(m.full_name)+'\')">Set starting weight now</button>';
+    return;
+  }
   var pctLost = parseFloat(((m.start_weight-wt)/m.start_weight*100).toFixed(2));
   var existing = LOGS.find(function(l){ return l.participant_id===pid&&l.week===week; });
   var devotPts = existing ? existing.devot_pts : 0;
