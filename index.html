@@ -3479,9 +3479,12 @@ async function saveChallenge(){
 // someone's weight-loss % appear to drop back to 0 just because they haven't re-weighed.
 async function getCarryForwardWeight(pid, mem){
   var res = await sb.from('logs').select('weight,pct_lost,week')
-    .eq('participant_id', pid).order('week',{ascending:false}).limit(1).maybeSingle();
-  if(res.data && res.data.weight){
-    return {weight: res.data.weight, pctLost: res.data.pct_lost||0};
+    .eq('participant_id', pid).order('week',{ascending:false}).limit(10);
+  var rows = (res.data||[]);
+  for(var i=0;i<rows.length;i++){
+    if(rows[i].weight && rows[i].weight > 0){
+      return {weight: rows[i].weight, pctLost: rows[i].pct_lost||0};
+    }
   }
   var startWt = (mem && mem.track_weight===false) ? 0 : ((mem && mem.start_weight)||0);
   return {weight: startWt, pctLost: 0};
