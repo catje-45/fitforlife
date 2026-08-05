@@ -3446,8 +3446,9 @@ async function saveBonus(){
     var res = await sb.from('logs').update({bonus_pts:bonus, total_pts:newTotal}).eq('id',existing.id);
     if(res.error){ err.textContent=res.error.message; return; }
   } else {
-    var wt = (m && m.track_weight===false) ? 0 : ((m && m.start_weight)||0);
-    var res2 = await sb.from('logs').insert({participant_id:pid, week:week, weight:wt, pct_lost:0, devot_pts:0, challenge_pts:0, bonus_pts:bonus, total_pts:bonus});
+    var cf = await getCarryForwardWeight(pid, m);
+    var wPts = (m && m.track_weight===false) ? 0 : Math.max(cf.pctLost,0);
+    var res2 = await sb.from('logs').insert({participant_id:pid, week:week, weight:cf.weight, pct_lost:cf.pctLost, devot_pts:0, challenge_pts:0, bonus_pts:bonus, total_pts:parseFloat((wPts+bonus).toFixed(2))});
     if(res2.error){ err.textContent=res2.error.message; return; }
   }
   closeModal('m-bonus');
@@ -3472,6 +3473,20 @@ async function saveChallenge(){
   await refreshCurrentTab();
 }
 // Recalculate a participant's challenge_pts + total for one week (uses fresh DB + current CHALLENGES)
+// Returns the weight/pct_lost to use for a week where no real weigh-in happened yet,
+// by carrying forward the participant's most recent ACTUAL weigh-in (any prior week)
+// instead of resetting to start_weight/0% — so devot/challenge approvals never make
+// someone's weight-loss % appear to drop back to 0 just because they haven't re-weighed.
+async function getCarryForwardWeight(pid, mem){
+  var res = await sb.from('logs').select('weight,pct_lost,week')
+    .eq('participant_id', pid).order('week',{ascending:false}).limit(1).maybeSingle();
+  if(res.data && res.data.weight){
+    return {weight: res.data.weight, pctLost: res.data.pct_lost||0};
+  }
+  var startWt = (mem && mem.track_weight===false) ? 0 : ((mem && mem.start_weight)||0);
+  return {weight: startWt, pctLost: 0};
+}
+
 async function recalcChallengeWeek(pid, week){
   var subsRes = await sb.from('challenge_submissions').select('challenge_id').eq('participant_id',pid).eq('status','approved');
   var chPts = 0;
@@ -3487,8 +3502,9 @@ async function recalcChallengeWeek(pid, week){
     var newTotal = parseFloat((weightPts + (existing.devot_pts||0) + chPts + (existing.bonus_pts||0)).toFixed(2));
     await sb.from('logs').update({challenge_pts:chPts, total_pts:newTotal}).eq('id',existing.id);
   } else if(chPts > 0){
-    var wt = (mem && mem.track_weight===false) ? 0 : ((mem && mem.start_weight)||0);
-    await sb.from('logs').insert({participant_id:pid, week:week, weight:wt, pct_lost:0, devot_pts:0, challenge_pts:chPts, bonus_pts:0, total_pts:chPts});
+    var cf2 = await getCarryForwardWeight(pid, mem);
+    var wPts2 = (mem && mem.track_weight===false) ? 0 : Math.max(cf2.pctLost,0);
+    await sb.from('logs').insert({participant_id:pid, week:week, weight:cf2.weight, pct_lost:cf2.pctLost, devot_pts:0, challenge_pts:chPts, bonus_pts:0, total_pts:parseFloat((wPts2+chPts).toFixed(2))});
   }
 }
 
@@ -3799,10 +3815,11 @@ async function reviewSubmission(subId, status){
         var newTotal = parseFloat((weightPts + existing.devot_pts + chPts + (existing.bonus_pts||0)).toFixed(2));
         await sb.from('logs').update({challenge_pts:chPts, total_pts:newTotal}).eq('id',existing.id);
       } else if(chPts > 0){
-        var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+        var cf3 = await getCarryForwardWeight(sub.participant_id, mem);
+        var wPts3 = mem.track_weight===false ? 0 : Math.max(cf3.pctLost,0);
         await sb.from('logs').insert({
           participant_id:sub.participant_id, week:week,
-          weight:wt, pct_lost:0, devot_pts:0, challenge_pts:chPts, total_pts:chPts
+          weight:cf3.weight, pct_lost:cf3.pctLost, devot_pts:0, challenge_pts:chPts, total_pts:parseFloat((wPts3+chPts).toFixed(2))
         });
       }
     }
@@ -4055,10 +4072,11 @@ async function reviewWeeklyDevot(subId, status, pts){
       var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts + (existing.bonus_pts||0)).toFixed(2));
       await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
     } else if(devotPts > 0){
-      var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+      var cf4 = await getCarryForwardWeight(sub.participant_id, mem);
+      var wPts4 = mem.track_weight===false ? 0 : Math.max(cf4.pctLost,0);
       await sb.from('logs').insert({
         participant_id:sub.participant_id, week:sub.week,
-        weight:wt, pct_lost:0, devot_pts:devotPts, challenge_pts:0, total_pts:devotPts
+        weight:cf4.weight, pct_lost:cf4.pctLost, devot_pts:devotPts, challenge_pts:0, total_pts:parseFloat((wPts4+devotPts).toFixed(2))
       });
     }
   }
@@ -4555,12 +4573,13 @@ async function reviewDailyResponse(id, status){
       var newTotal = parseFloat((weightPts + devotPts + existing.challenge_pts + (existing.bonus_pts||0)).toFixed(2));
       await sb.from('logs').update({devot_pts:devotPts, total_pts:newTotal}).eq('id',existing.id);
     } else if(devotPts > 0){
-      var wt = mem.track_weight===false ? 0 : (mem.start_weight||0);
+      var cf5 = await getCarryForwardWeight(resp.participant_id, mem);
+      var wPts5 = mem.track_weight===false ? 0 : Math.max(cf5.pctLost,0);
       await sb.from('logs').insert({
         participant_id:resp.participant_id, week:week,
-        weight:wt, pct_lost:0,
+        weight:cf5.weight, pct_lost:cf5.pctLost,
         devot_pts:devotPts, challenge_pts:0,
-        total_pts:devotPts
+        total_pts:parseFloat((wPts5+devotPts).toFixed(2))
       });
     }
   }
