@@ -918,8 +918,15 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
     <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-latesub-label">
       <input type="checkbox" id="ms-latesub" onchange="document.getElementById('ms-latesub-label').style.borderColor=this.checked?'var(--g)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--g)">
       <div>
-        <div style="font-size:16px;font-weight:600;color:var(--tx)">⏰ Allow late submissions</div>
-        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Overrides all deadlines — participants can submit daily devotionals, weekly devotionals, and task challenges past their due dates.</div>
+        <div style="font-size:16px;font-weight:600;color:var(--tx)">⏰ Allow late challenge submissions</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Opens all past weeks for task challenge submissions instead of the normal rolling 4-week window.</div>
+      </div>
+    </label>
+    <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-latedevot-label">
+      <input type="checkbox" id="ms-latedevot" onchange="document.getElementById('ms-latedevot-label').style.borderColor=this.checked?'var(--g)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--g)">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--tx)">⏰ Allow late devotion submissions</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Lets participants submit daily and weekly devotionals past their normal deadlines.</div>
       </div>
     </label>
   </div>
@@ -2120,7 +2127,7 @@ function renderAdminDevot(){
     var submittedAt2 = myWdsSub.created_at ? new Date(myWdsSub.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
     html += '<span class="tag '+wsc2+'" style="margin-bottom:.5rem;display:inline-block">'+wsl2+'</span>'
       +'<div style="font-size:15px;color:var(--tx3);margin-bottom:.5rem">Submitted: '+submittedAt2+'</div>';
-    if(myWdsSub.status==='rejected'&&!weekExpired) html += '<button class="btn btn-g" style="height:38px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>';
+    if(myWdsSub.status==='rejected') html += '<button class="btn btn-g" style="height:38px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>';
   } else if(weekExpired){
     html += '<div style="font-size:15px;color:var(--danger)">&#128274; Deadline passed · '+deadlineStr+'</div>';
   } else {
@@ -2705,8 +2712,8 @@ function renderPartDevot(){
         :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openDailyReflectModal(\''+todayDevot.id+'\')">&#9997; Write reflection</button>');
   }
   html += '</div>';
-  // Missed devotionals — only show when late submissions are allowed
-  if(SETTINGS && SETTINGS.allow_late_submissions){
+  // Missed devotionals — only show when late devotion submissions are allowed
+  if(SETTINGS && SETTINGS.allow_late_devotions){
     var myResponseIds = DAILY_RESPONSES.filter(function(r){ return r.participant_id===PROFILE.id; }).map(function(r){ return r.devotional_id; });
     var missed = DAILY_DEVOTIONALS.filter(function(d){ return d.date<today && d.date>=(SETTINGS.challenge_start_date||'') && !myResponseIds.includes(d.id); })
       .sort(function(a,b){ return b.date.localeCompare(a.date); });
@@ -2762,25 +2769,13 @@ function renderPartDevot(){
       +'<div style="font-size:16px;color:var(--tx3);margin-bottom:.75rem">Submitted: '+submittedAt+'</div>'
       +'<div style="font-size:18px;color:var(--tx2);font-style:italic;border-left:3px solid var(--bdr2);padding-left:.75rem;line-height:1.6;margin-bottom:.75rem">\u201c'+myWdsSub.reflection+'\u201d</div>';
     if(myWdsSub.screenshot_url) html += '<div class="sshot-lazy" data-sspath="'+myWdsSub.screenshot_url+'" style="width:100%;min-height:60px;margin-bottom:.75rem"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>';
-    if(myWdsSub.status==='rejected'&&!weekExpired) html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
-    if(myWdsSub.status==='rejected'&&weekExpired) html += '<div style="font-size:13px;color:var(--danger);margin-top:.5rem">&#128274; Deadline passed \u2014 resubmission closed</div>';
+    if(myWdsSub.status==='rejected') html += !roMode?'<button class="btn btn-g" style="height:42px;font-size:13px" onclick="openWeeklyDevotModal()">Resubmit</button>':'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>';
   } else if(weekExpired){
-    if(SETTINGS && SETTINGS.allow_late_submissions){
-      html += '<div style="font-size:18px;color:var(--tx2);line-height:1.6;margin-bottom:.75rem">'
-        +'Attend your group devotional this week. Submit your reflection and a screenshot of the group call to earn points.</div>'
-        +'<div style="display:flex;align-items:center;gap:8px;padding:.6rem .75rem;background:var(--golddim);border-radius:var(--rs);margin-bottom:.875rem">'
-        +'<span style="font-size:16px">&#9203;</span>'
-        +'<div style="font-size:13px"><span style="color:var(--warn);font-weight:600">Late submission open</span><span style="color:var(--tx3)"> &middot; Deadline was '+deadlineStr+'</span></div>'
-        +'</div>'
-        +(roMode?'<div style="font-size:14px;color:var(--warn);padding:.5rem;background:var(--golddim);border-radius:var(--rs)">&#128274; Submissions disabled in read-only mode</div>'
-          :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal('+SETTINGS.current_week+')">&#128218; Submit late reflection + screenshot</button>');
-    } else {
-      html += '<div style="text-align:center;padding:1rem 0">'
-        +'<div style="font-size:28px;margin-bottom:.5rem">&#128274;</div>'
-        +'<div style="font-size:20px;font-weight:600;color:var(--danger);margin-bottom:4px">Submission closed</div>'
-        +'<div style="font-size:18px;color:var(--tx3)">Deadline was '+deadlineStr+'</div>'
-        +'</div>';
-    }
+    html += '<div style="text-align:center;padding:1rem 0">'
+      +'<div style="font-size:28px;margin-bottom:.5rem">&#128274;</div>'
+      +'<div style="font-size:20px;font-weight:600;color:var(--danger);margin-bottom:4px">Submission closed</div>'
+      +'<div style="font-size:18px;color:var(--tx3)">Deadline was '+deadlineStr+'</div>'
+      +'</div>';
   } else {
     html += '<div style="font-size:18px;color:var(--tx2);line-height:1.6;margin-bottom:.75rem">'
       +'Attend your group devotional this week. Submit your reflection and a screenshot of the group call to earn points.</div>'
@@ -2789,15 +2784,15 @@ function renderPartDevot(){
       +'<div style="font-size:13px"><span style="color:var(--tx2)">Deadline: </span><span style="color:var(--warn);font-weight:600">'+deadlineStr+'</span></div>'
       +'</div>'
       +(roMode?'<div style="font-size:14px;color:var(--warn);padding:.5rem;background:var(--golddim);border-radius:var(--rs)">&#128274; Submissions disabled in read-only mode</div>'
-        :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal()">&#128218; Submit reflection + screenshot</button>');
+        :'<button class="btn btn-g" style="height:44px;font-size:13px" onclick="openWeeklyDevotModal('+SETTINGS.current_week+')">&#128218; Submit reflection + screenshot</button>');
   }
   html += '</div>';
   // Past weekly submissions
   var myPastWeekly = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.participant_id===PROFILE.id&&s.week!==SETTINGS.current_week; })
     .sort(function(a,b){ return b.week-a.week; });
 
-  // Missed past weeks — only when late submissions allowed
-  if(SETTINGS && SETTINGS.allow_late_submissions){
+  // Missed past weeks — only show when late devotion submissions are allowed
+  if(SETTINGS && SETTINGS.allow_late_devotions){
     var submittedWeeks = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.participant_id===PROFILE.id; }).map(function(s){ return s.week; });
     var missedWeeks = [];
     for(var mw = SETTINGS.current_week-1; mw >= 1; mw--){
@@ -2833,6 +2828,7 @@ function renderPartDevot(){
         +'<div style="font-size:14px;color:var(--tx3);margin-bottom:4px">Submitted: '+subDate+'</div>'
         +'<div style="font-size:15px;color:var(--tx2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u201c'+s.reflection.slice(0,80)+(s.reflection.length>80?'...\u201d':'\u201d')+'</div>'
         +(s.screenshot_url?'<div class="sshot-lazy" data-sspath="'+s.screenshot_url+'" style="margin-top:6px;min-height:60px"><div style="color:var(--tx3);font-size:13px;padding:.25rem">Loading...</div></div>':'')
+        +(s.status==='rejected'?(roMode?'<div style="font-size:13px;color:var(--warn);margin-top:.5rem">&#128274; Resubmission disabled in read-only mode</div>':'<button class="btn-sm btn-sm-g" style="width:100%;height:36px;font-size:12px;margin-top:.5rem" onclick="openWeeklyDevotModal('+s.week+')">&#9997; Resubmit for Week '+s.week+'</button>'):'')
         +'</div>';
     });
     html += '</div>';
@@ -2987,7 +2983,8 @@ function renderPartChallenges(){
   if(roMode) html += readOnlyBanner();
 
   // Show current week + up to 3 previous weeks (4 weeks total) as open for submission.
-  // When late submissions are allowed, ALL past weeks are open.
+  // The "Allow late submissions" toggle controls task challenges specifically —
+  // devotionals (daily and weekly) always allow late submission regardless of it.
   var minOpenWeek = (SETTINGS && SETTINGS.allow_late_submissions) ? 1 : Math.max(1, SETTINGS.current_week - 3);
   var openWeeks = [];
   for(var w = SETTINGS.current_week; w >= minOpenWeek; w--) openWeeks.push(w);
@@ -3049,7 +3046,7 @@ function renderPartChallenges(){
     html += '</div>';
   }
 
-  // Older past challenges (before the 4-week open window) — read-only display
+  // Older past challenges (before the 4-week open window) — read-only, except rejected ones can still be fixed
   var closedPast = CHALLENGES.filter(function(ch){ return ch.week < minOpenWeek; });
   if(closedPast.length){
     var byw2 = {};
@@ -3058,7 +3055,14 @@ function renderPartChallenges(){
     Object.keys(byw2).sort(function(a,b){ return b-a; }).forEach(function(w){
       html += '<div style="margin-bottom:.5rem"><div style="font-size:15px;color:var(--tx3);margin-bottom:3px">Week '+w+'</div>';
       byw2[w].forEach(function(ch){
-        html += '<div style="font-size:18px;color:var(--tx2);padding:3px 0;border-bottom:1px solid var(--bdr)">'+ch.description+' <span class="tag tgray">+'+ch.pts+'</span></div>';
+        var pastSub = SUBMISSIONS.find(function(s){ return s.challenge_id===ch.id&&s.participant_id===PROFILE.id; });
+        html += '<div style="padding:3px 0;border-bottom:1px solid var(--bdr)">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+          +'<div style="font-size:18px;color:var(--tx2)">'+ch.description+'</div>'
+          +'<span class="tag '+(pastSub?(pastSub.status==='approved'?'tg':pastSub.status==='rejected'?'tred':'tgray'):'tgray')+'" style="flex-shrink:0">'+(pastSub?(pastSub.status==='approved'?'+'+ch.pts:pastSub.status==='rejected'?'Rejected':'Pending'):'+'+ch.pts)+'</span>'
+          +'</div>'
+          +(pastSub&&pastSub.status==='rejected'?(roMode?'<div style="font-size:13px;color:var(--warn);margin-top:4px">&#128274; Resubmission disabled in read-only mode</div>':'<button class="btn-sm btn-sm-g" style="width:100%;height:32px;font-size:12px;margin-top:4px" onclick="openSubmitModal(\''+ch.id+'\',\''+esc(ch.description)+'\')">&#9997; Resubmit</button>'):'')
+          +'</div>';
       });
       html += '</div>';
     });
@@ -3583,6 +3587,9 @@ function openSettingsModal(){
   var late = !!SETTINGS.allow_late_submissions;
   document.getElementById('ms-latesub').checked = late;
   document.getElementById('ms-latesub-label').style.borderColor = late?'var(--g)':'var(--bdr)';
+  var lateDevot = !!SETTINGS.allow_late_devotions;
+  document.getElementById('ms-latedevot').checked = lateDevot;
+  document.getElementById('ms-latedevot-label').style.borderColor = lateDevot?'var(--g)':'var(--bdr)';
   openModal('m-settings');
 }
 async function saveSettings(){
@@ -3592,11 +3599,13 @@ async function saveSettings(){
   var maintenance = document.getElementById('ms-maintenance').checked;
   var readOnly = document.getElementById('ms-readonly').checked;
   var lateSubmissions = document.getElementById('ms-latesub').checked;
+  var lateDevotions = document.getElementById('ms-latedevot').checked;
   if(wk<1||wk>13||isNaN(fee)||fee<=0) return;
-  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, read_only_mode:readOnly, allow_late_submissions:lateSubmissions, updated_at:new Date().toISOString()}).eq('id',1);
+  await sb.from('settings').update({current_week:wk, entry_fee:fee, challenge_start_date:startDate, maintenance_mode:maintenance, read_only_mode:readOnly, allow_late_submissions:lateSubmissions, allow_late_devotions:lateDevotions, updated_at:new Date().toISOString()}).eq('id',1);
   SETTINGS.allow_late_submissions = lateSubmissions;
+  SETTINGS.allow_late_devotions = lateDevotions;
   closeModal('m-settings');
-  toast(maintenance?'🔧 Maintenance mode ON':readOnly?'👁 Read-only mode ON':lateSubmissions?'⏰ Late submissions allowed':'Settings saved!');
+  toast(maintenance?'🔧 Maintenance mode ON':readOnly?'👁 Read-only mode ON':(lateSubmissions||lateDevotions)?'⏰ Late submission settings updated':'Settings saved!');
   await refreshCurrentTab();
 }
 
@@ -3869,7 +3878,9 @@ function getWeekDeadline(weekNum){
 }
 
 function isWeekExpired(weekNum){
-  if(SETTINGS && SETTINGS.allow_late_submissions) return false;
+  // This gates weekly devotional deadlines specifically (task challenges use a
+  // separate, toggle-controlled window via minOpenWeek in renderPartChallenges).
+  if(SETTINGS && SETTINGS.allow_late_devotions) return false;
   var end = getWeekEndDate(weekNum);
   if(!end) return false;
   return new Date() > end;
@@ -3939,8 +3950,10 @@ async function saveWeeklyDevotSub(){
   var words = reflection.split(/\s+/).filter(function(w){ return w.length>0; }).length;
   var err = document.getElementById('wds-err');
   if(words<30){ err.textContent='At least 30 words required ('+words+' so far)'; return; }
-  // Deadline check
-  if(isWeekExpired(wdsTargetWeek)){
+  // Deadline check — skipped if this is a resubmission of a rejected entry for this week
+  var existingWds = WEEKLY_DEVOT_SUBS.find(function(s){ return s.participant_id===PROFILE.id && s.week===wdsTargetWeek; });
+  var isRejectedResubmitWds = existingWds && existingWds.status==='rejected';
+  if(isWeekExpired(wdsTargetWeek) && !isRejectedResubmitWds){
     err.textContent='The deadline for Week '+wdsTargetWeek+' has passed. Submission is now closed.';
     return;
   }
@@ -4626,12 +4639,14 @@ async function saveDailyReflection(){
   if(words<30){ err.textContent='At least 30 words required ('+words+' so far)'; return; }
   if(!currentDailyDevotId){ err.textContent='No devotional selected'; return; }
   var devot = DAILY_DEVOTIONALS.find(function(d){ return d.id===currentDailyDevotId; });
+  var existingResp = DAILY_RESPONSES.find(function(r){ return r.devotional_id===currentDailyDevotId && r.participant_id===PROFILE.id; });
+  var isRejectedResubmit = existingResp && existingResp.status==='rejected';
   // Check deadline — use stored deadline or default to end of day
   var deadline = devot&&devot.deadline ? new Date(devot.deadline) : null;
   if(!deadline && devot) {
     deadline = new Date(devot.date+'T23:59:59');
   }
-  if(deadline && new Date() > deadline && !(SETTINGS && SETTINGS.allow_late_submissions)){
+  if(deadline && new Date() > deadline && !(SETTINGS && SETTINGS.allow_late_devotions) && !isRejectedResubmit){
     err.textContent='The submission deadline has passed for this devotional'; return;
   }
   var btn = document.getElementById('dr-submit-btn');
