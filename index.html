@@ -919,7 +919,7 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
       <input type="checkbox" id="ms-latesub" onchange="document.getElementById('ms-latesub-label').style.borderColor=this.checked?'var(--g)':'var(--bdr)'" style="width:18px;height:18px;accent-color:var(--g)">
       <div>
         <div style="font-size:16px;font-weight:600;color:var(--tx)">⏰ Allow late challenge submissions</div>
-        <div style="font-size:13px;color:var(--tx3);margin-top:2px">Opens all past weeks for task challenge submissions instead of the normal rolling 4-week window.</div>
+        <div style="font-size:13px;color:var(--tx3);margin-top:2px">By default only the current week's challenges are open. Turn this on to also open every past week for submission.</div>
       </div>
     </label>
     <label style="display:flex;align-items:center;gap:12px;padding:.75rem;background:var(--bg3);border-radius:var(--rs);border:1.5px solid var(--bdr);cursor:pointer" id="ms-latedevot-label">
@@ -2982,10 +2982,10 @@ function renderPartChallenges(){
   var html = '<div style="padding-bottom:1rem">';
   if(roMode) html += readOnlyBanner();
 
-  // Show current week + up to 3 previous weeks (4 weeks total) as open for submission.
-  // The "Allow late submissions" toggle controls task challenges specifically —
-  // devotionals (daily and weekly) always allow late submission regardless of it.
-  var minOpenWeek = (SETTINGS && SETTINGS.allow_late_submissions) ? 1 : Math.max(1, SETTINGS.current_week - 3);
+  // Only the current week is open for submission by default — the "Allow late
+  // challenge submissions" toggle expands this to every past week when enabled.
+  // (Devotionals have their own separate toggle and aren't affected by this one.)
+  var minOpenWeek = (SETTINGS && SETTINGS.allow_late_submissions) ? 1 : SETTINGS.current_week;
   var openWeeks = [];
   for(var w = SETTINGS.current_week; w >= minOpenWeek; w--) openWeeks.push(w);
 
