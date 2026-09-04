@@ -2888,7 +2888,7 @@ function renderAdminWeightLoss(){
     var latest = mLogs.slice().sort(function(a,b){ return b.week-a.week; })[0];
     var startWt = m.start_weight||null;
     var curWt = latest ? latest.weight : null;
-    var pctLost = latest ? (latest.pct_lost||0) : 0;
+    var pctLost = startWt ? getRoundWeightPct(mLogs, startWt) : 0;
     var kgLost = (startWt && curWt) ? parseFloat((startWt-curWt).toFixed(1)) : 0;
     return {m:m, startWt:startWt, curWt:curWt, pctLost:pctLost, kgLost:kgLost, hasLog:!!latest};
   }).sort(function(a,b){ return b.pctLost-a.pctLost; });
@@ -2950,6 +2950,21 @@ function openWeightDetail(pid){
     +'<div style="font-size:22px;font-weight:700;font-family:var(--head);color:'+(totalKgLost>0?'var(--g)':'var(--tx)')+'">'+(totalKgLost!==null?totalKgLost+'kg':'—')+'</div>'
     +'</div>'
     +'</div>';
+
+  if(m.start_weight){
+    var rounds = getRoundWeightBreakdown(mLogs, m.start_weight);
+    var roundTotal = getRoundWeightPct(mLogs, m.start_weight);
+    html2 += '<div class="c-title" style="margin-bottom:.5rem">Round-based scoring <span style="font-size:14px;font-weight:400;color:var(--tx3)">total: '+roundTotal.toFixed(2)+'%</span></div>'
+      +'<div style="margin-bottom:1rem">';
+    rounds.forEach(function(r){
+      html2 += '<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--bdr)">'
+        +'<div><div style="font-size:16px;font-weight:600">Round '+r.round+' <span style="font-size:13px;color:var(--tx3);font-weight:400">(through Wk'+r.endWeek+')</span></div>'
+        +'<div style="font-size:13px;color:var(--tx3)">'+r.baseline+'kg &#8594; '+r.endWeight+'kg'+(!r.hasData?' (no weigh-in yet)':'')+'</div></div>'
+        +'<div style="font-size:18px;font-weight:600;color:'+(r.pct>0?'var(--g)':'var(--tx3)')+'">'+r.pct.toFixed(2)+'%</div>'
+        +'</div>';
+    });
+    html2 += '</div>';
+  }
 
   if(!mLogs.length){
     html2 += '<div class="empty" style="padding:1rem"><span class="empty-icon">⚖️</span>No weigh-ins logged yet</div>';
@@ -3120,17 +3135,52 @@ function teamLbItem(x, i, maxPts, maskNames){
 }
 
 // ── SCORING ───────────────────────────────────────────────────────────────────
+// Round-based weight-loss scoring. Each round's baseline is the weigh-in at the
+// end of the previous round (starting weight for round 1). A round only ever
+// contributes 0 or more — no change or a gain in a round adds nothing, it never
+// subtracts from rounds already earned. The participant's total % is the SUM
+// of every round's percentage, not just their latest single weigh-in.
+var ROUND_END_WEEKS = [5, 9, 13];
+function getRoundWeightPct(logs, startWeight){
+  if(!startWeight) return 0;
+  var baseline = startWeight;
+  var total = 0;
+  for(var i=0;i<ROUND_END_WEEKS.length;i++){
+    var endWeek = ROUND_END_WEEKS[i];
+    var atEnd = logs.filter(function(l){ return l.week<=endWeek; }).sort(function(a,b){ return b.week-a.week; })[0];
+    var endWeight = atEnd ? atEnd.weight : baseline; // no weigh-in yet this round = no change
+    var roundPct = baseline>0 ? Math.max(0,(baseline-endWeight)/baseline*100) : 0;
+    total += roundPct;
+    baseline = endWeight; // next round's baseline is this round's ending weight
+  }
+  return parseFloat(total.toFixed(2));
+}
+// Returns the per-round breakdown (for display in the weight detail modal)
+function getRoundWeightBreakdown(logs, startWeight){
+  var rounds = [];
+  if(!startWeight) return rounds;
+  var baseline = startWeight;
+  for(var i=0;i<ROUND_END_WEEKS.length;i++){
+    var endWeek = ROUND_END_WEEKS[i];
+    var atEnd = logs.filter(function(l){ return l.week<=endWeek; }).sort(function(a,b){ return b.week-a.week; })[0];
+    var endWeight = atEnd ? atEnd.weight : baseline;
+    var roundPct = baseline>0 ? Math.max(0,(baseline-endWeight)/baseline*100) : 0;
+    rounds.push({round:i+1, endWeek:endWeek, baseline:baseline, endWeight:endWeight, pct:parseFloat(roundPct.toFixed(2)), hasData:!!atEnd});
+    baseline = endWeight;
+  }
+  return rounds;
+}
+
 function getIndPts(){
   return MEMBERS.filter(function(p){ return p.role !== 'pending'; }).map(function(p){
     var logs = LOGS.filter(function(l){ return l.participant_id===p.id; });
-    var latest = logs.slice().sort(function(a,b){ return b.week-a.week; })[0];
-    var latestPct = latest ? latest.pct_lost : 0;
+    var roundPct = p.track_weight===false ? 0 : getRoundWeightPct(logs, p.start_weight);
     var devotTotal = logs.reduce(function(s,l){ return s+l.devot_pts; },0);
     var challengeTotal = logs.reduce(function(s,l){ return s+l.challenge_pts; },0);
     // Devot-only participants don't get weight loss points
-    var weightPts = p.track_weight === false ? 0 : Math.max(latestPct, 0);
+    var weightPts = p.track_weight === false ? 0 : roundPct;
     var total = parseFloat((weightPts+devotTotal+challengeTotal).toFixed(2));
-    return {p:p, latestPct: p.track_weight===false ? null : latestPct, devotTotal:devotTotal, challengeTotal:challengeTotal, total:total};
+    return {p:p, latestPct: p.track_weight===false ? null : roundPct, devotTotal:devotTotal, challengeTotal:challengeTotal, total:total};
   }).sort(function(a,b){ return b.total-a.total; });
 }
 
