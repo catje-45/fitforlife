@@ -816,6 +816,35 @@ select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:im
   <div id="wd-body"></div>
 </div></div>
 
+<!-- Challenge Report -->
+<div class="modal-bg" id="m-challenge-report"><div class="modal">
+  <div class="modal-head"><span class="modal-title">&#128203; Challenge report</span><button class="modal-x" onclick="closeModal('m-challenge-report')">&#10005;</button></div>
+  <div id="cr-body"></div>
+</div></div>
+
+<!-- Challenge Report — individual detail -->
+<div class="modal-bg" id="m-challenge-report-detail"><div class="modal">
+  <div class="modal-head"><span class="modal-title" id="crd-title">&#128203; Challenges</span><button class="modal-x" onclick="closeModal('m-challenge-report-detail')">&#10005;</button></div>
+  <div id="crd-body"></div>
+</div></div>
+
+<!-- Devotion Completion Report -->
+<div class="modal-bg" id="m-devot-completion"><div class="modal">
+  <div class="modal-head"><span class="modal-title">&#128214; Devotion completion</span><button class="modal-x" onclick="closeModal('m-devot-completion')">&#10005;</button></div>
+  <div id="dc-body"></div>
+</div></div>
+
+<!-- Devotion Completion — individual detail -->
+<div class="modal-bg" id="m-devot-completion-detail"><div class="modal">
+  <div class="modal-head"><span class="modal-title" id="dcd-title">&#128214; Devotions</span><button class="modal-x" onclick="closeModal('m-devot-completion-detail')">&#10005;</button></div>
+  <div id="dcd-body"></div>
+</div></div>
+
+<!-- Challenge Points Ranking -->
+<div class="modal-bg" id="m-challenge-ranking"><div class="modal">
+  <div class="modal-head"><span class="modal-title">&#127942; Challenge ranking</span><button class="modal-x" onclick="closeModal('m-challenge-ranking')">&#10005;</button></div>
+  <div id="chr-body"></div>
+</div></div>
 <!-- Edit Daily Reflection (admin only) -->
 <div class="modal-bg" id="m-edit-daily-response"><div class="modal">
   <div class="modal-head"><span class="modal-title">✎ Edit reflection</span><button class="modal-x" onclick="closeModal('m-edit-daily-response')">✕</button></div>
@@ -1388,6 +1417,9 @@ function renderAdminDash(){
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openLogModal()">&#9878; Log weight</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openChallengeModal()">+ Challenge</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openBonusModal()">&#11088; Bonus points</button>'
+    +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openChallengeReportModal()">&#128203; Challenge report</button>'
+    +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openDevotCompletionModal()">&#128214; Devotion completion</button>'
+    +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openChallengeRankingModal()">&#127942; Challenge ranking</button>'
     +'<button class="btn btn-ghost" style="height:42px;font-size:13px" onclick="openSettingsModal()">&#9881; Settings</button>'
     +'</div></div>';
   return html + '</div>';
@@ -2983,6 +3015,146 @@ function openWeightDetail(pid){
   }
   document.getElementById('wd-body').innerHTML = html2;
   openModal('m-weight-detail');
+}
+
+// ── ADMIN: CHALLENGE REPORT ─────────────────────────────────────────────────────
+function openChallengeReportModal(){
+  var participants = MEMBERS.filter(function(m){ return m.role!=='pending'; });
+  var total = CHALLENGES.length;
+  var rows = participants.map(function(m){
+    var mySubs = SUBMISSIONS.filter(function(s){ return s.participant_id===m.id; });
+    var approved = mySubs.filter(function(s){ return s.status==='approved'; }).length;
+    var missed = total - mySubs.length;
+    return {m:m, total:total, submitted:mySubs.length, approved:approved, missed:missed};
+  }).sort(function(a,b){ return b.missed-a.missed || a.m.full_name.localeCompare(b.m.full_name); });
+
+  var html = '<div style="padding-bottom:.5rem">';
+  if(!total){
+    html += '<div class="empty" style="padding:1rem"><span class="empty-icon">&#128203;</span>No challenges posted yet</div>';
+  } else {
+    html += '<div style="font-size:14px;color:var(--tx3);margin-bottom:.75rem">'+total+' challenge'+(total!==1?'s':'')+' posted so far</div>';
+    rows.forEach(function(r){
+      html += '<div class="row-item" style="cursor:pointer" onclick="openChallengeReportDetail(\''+r.m.id+'\')">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+r.m.full_name+'</div>'
+        +'<div style="font-size:14px;color:var(--tx3)">'+r.submitted+'/'+r.total+' submitted &middot; '+r.approved+' approved</div></div>'
+        +'<span class="tag '+(r.missed===0?'tg':r.missed>=3?'tred':'tgray')+'" style="flex-shrink:0">'+r.missed+' missed</span>'
+        +'</div>';
+    });
+  }
+  html += '</div>';
+  document.getElementById('cr-body').innerHTML = html;
+  openModal('m-challenge-report');
+}
+
+function openChallengeReportDetail(pid){
+  var m = MEMBERS.find(function(x){ return x.id===pid; });
+  if(!m) return;
+  document.getElementById('crd-title').textContent = '\u{1F4CB} '+m.full_name;
+  var sorted = CHALLENGES.slice().sort(function(a,b){ return a.week-b.week; });
+  var html = '';
+  if(!sorted.length){
+    html = '<div class="empty" style="padding:1rem">No challenges posted yet</div>';
+  } else {
+    sorted.forEach(function(c){
+      var sub = SUBMISSIONS.find(function(s){ return s.participant_id===pid && s.challenge_id===c.id; });
+      var cls = sub ? (sub.status==='approved'?'tg':sub.status==='rejected'?'tred':'tgray') : 'tred';
+      var label = sub ? ('Submitted ('+sub.status+')') : 'Missed';
+      html += '<div class="row-item"><div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--tx3)">Wk'+c.week+'</div>'
+        +'<div style="font-size:16px;font-weight:500">'+c.description+'</div></div>'
+        +'<span class="tag '+cls+'" style="flex-shrink:0">'+label+'</span></div>';
+    });
+  }
+  document.getElementById('crd-body').innerHTML = html;
+  openModal('m-challenge-report-detail');
+}
+
+// ── ADMIN: DEVOTION COMPLETION REPORT ───────────────────────────────────────────
+function openDevotCompletionModal(){
+  var participants = MEMBERS.filter(function(m){ return m.role!=='pending'; });
+  var totalDaily = DAILY_DEVOTIONALS.length;
+  var totalWeekly = SETTINGS.current_week;
+  var rows = participants.map(function(m){
+    var dailyDone = DAILY_RESPONSES.filter(function(r){ return r.participant_id===m.id; }).length;
+    var weeklyDone = WEEKLY_DEVOT_SUBS.filter(function(s){ return s.participant_id===m.id; }).length;
+    var totalPossible = totalDaily+totalWeekly;
+    var totalDone = dailyDone+weeklyDone;
+    var pct = totalPossible ? Math.round(totalDone/totalPossible*100) : 0;
+    return {m:m, dailyDone:dailyDone, weeklyDone:weeklyDone, totalDaily:totalDaily, totalWeekly:totalWeekly, pct:pct};
+  }).sort(function(a,b){ return b.pct-a.pct || a.m.full_name.localeCompare(b.m.full_name); });
+
+  var html = '<div style="padding-bottom:.5rem">'
+    +'<div style="font-size:14px;color:var(--tx3);margin-bottom:.75rem">'+totalDaily+' daily devotional'+(totalDaily!==1?'s':'')+' posted &middot; through Week '+totalWeekly+'</div>';
+  rows.forEach(function(r){
+    html += '<div class="row-item" style="cursor:pointer" onclick="openDevotCompletionDetail(\''+r.m.id+'\')">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+r.m.full_name+'</div>'
+      +'<div style="font-size:14px;color:var(--tx3)">Daily: '+r.dailyDone+'/'+r.totalDaily+' &middot; Weekly: '+r.weeklyDone+'/'+r.totalWeekly+'</div></div>'
+      +'<div style="font-size:18px;font-weight:600;color:'+(r.pct>=80?'var(--g)':r.pct>=50?'var(--warn)':'var(--danger)')+'">'+r.pct+'%</div>'
+      +'</div>';
+  });
+  html += '</div>';
+  document.getElementById('dc-body').innerHTML = html;
+  openModal('m-devot-completion');
+}
+
+function openDevotCompletionDetail(pid){
+  var m = MEMBERS.find(function(x){ return x.id===pid; });
+  if(!m) return;
+  document.getElementById('dcd-title').textContent = '\u{1F4D6} '+m.full_name;
+  var html = '<div class="c-title" style="margin-bottom:.5rem">Daily devotionals</div>';
+  var sortedDaily = DAILY_DEVOTIONALS.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+  if(!sortedDaily.length){
+    html += '<div class="empty" style="padding:.5rem">None posted yet</div>';
+  } else {
+    sortedDaily.forEach(function(d){
+      var r = DAILY_RESPONSES.find(function(x){ return x.devotional_id===d.id && x.participant_id===pid; });
+      var cls = r ? (r.status==='approved'?'tg':r.status==='rejected'?'tred':'tgray') : 'tred';
+      var label = r ? ('Submitted ('+r.status+')') : 'Missed';
+      html += '<div class="row-item"><div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--tx3)">'+formatDate(d.date)+'</div>'
+        +'<div style="font-size:16px;font-weight:500">'+d.title+'</div></div>'
+        +'<span class="tag '+cls+'" style="flex-shrink:0">'+label+'</span></div>';
+    });
+  }
+  html += '<div class="c-title" style="margin:1rem 0 .5rem">Weekly devotionals</div>';
+  for(var w=1; w<=SETTINGS.current_week; w++){
+    var s = WEEKLY_DEVOT_SUBS.find(function(x){ return x.week===w && x.participant_id===pid; });
+    var cls2 = s ? (s.status==='approved'?'tg':s.status==='rejected'?'tred':'tgray') : 'tred';
+    var label2 = s ? ('Submitted ('+s.status+')') : 'Missed';
+    html += '<div class="row-item"><div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:500">Week '+w+'</div></div>'
+      +'<span class="tag '+cls2+'" style="flex-shrink:0">'+label2+'</span></div>';
+  }
+  document.getElementById('dcd-body').innerHTML = html;
+  openModal('m-devot-completion-detail');
+}
+
+// ── ADMIN: CHALLENGE POINTS RANKING ─────────────────────────────────────────────
+function openChallengeRankingModal(){
+  var pts = getIndPts().filter(function(x){ return x.p.role!=='pending'; })
+    .slice().sort(function(a,b){ return b.challengeTotal-a.challengeTotal; });
+  var maxPts = pts[0] ? (pts[0].challengeTotal||1) : 1;
+  var html = '<div style="padding-bottom:.5rem">';
+  if(!pts.length){
+    html += '<div class="empty" style="padding:1rem">No data yet</div>';
+  } else {
+    pts.forEach(function(x,i){
+      var ti = TEAMS.findIndex(function(t){ return t.id===x.p.team_id; });
+      var c = tc(ti<0?0:ti);
+      var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
+      var rc = i===0?'var(--gold)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--tx3)';
+      var barW = Math.max(0, Math.round((x.challengeTotal/maxPts)*100));
+      html += '<div class="lb '+cls+'">'
+        +'<div class="lb-rank" style="color:'+rc+'">'+(i+1)+'</div>'
+        +'<div class="av" style="background:'+c.bg+';color:'+c.fg+'">'+initials(x.p.full_name)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="lb-name">'+x.p.full_name+'</div>'
+        +'<div class="prog"><div class="prog-f" style="width:'+barW+'%"></div></div>'
+        +'</div>'
+        +'<div class="lb-pts" style="color:'+(i===0?'var(--gold)':'var(--tx)')+'">'+x.challengeTotal+' pts</div>'
+        +'</div>';
+    });
+  }
+  html += '</div>';
+  document.getElementById('chr-body').innerHTML = html;
+  openModal('m-challenge-ranking');
 }
 
 // ── PARTICIPANT: CHALLENGES ───────────────────────────────────────────────────
